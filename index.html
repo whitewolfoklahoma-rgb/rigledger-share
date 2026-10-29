@@ -1,0 +1,1403 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RigLedger — Load, Cost-Per-Mile &amp; IFTA Tracker for Owner-Operators</title>
+<style>
+  :root{
+    --ink:#1e293b; --muted:#64748b; --brand:#b45309; --brand2:#7c2d12;
+    --bg:#faf7f2; --card:#ffffff; --line:#e7e0d4; --accent:#fef3c7;
+    --warn:#9a3412; --warnbg:#fff7ed; --bad:#b3261e; --good:#166534;
+  }
+  html{box-sizing:border-box}
+  body{margin:0;font-family:-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;background:var(--bg);color:var(--ink);font-size:15px;line-height:1.45}
+  header{background:var(--brand2);color:#fff;padding:14px 16px}
+  header .wrap{max-width:1080px;margin:0 auto;display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between}
+  header h1{font-size:20px;margin:0}
+  header .sub{font-size:12.5px;opacity:.85;margin-top:2px}
+  .yearbox{display:flex;align-items:center;gap:8px;font-size:14px}
+  .yearbox select{font-size:15px;padding:6px 8px;border-radius:6px;border:1px solid var(--line)}
+  nav{background:#fff;border-bottom:1px solid var(--line);position:sticky;top:0;z-index:5}
+  nav .wrap{max-width:1080px;margin:0 auto;display:flex;flex-wrap:wrap;gap:2px;padding:6px 8px}
+  nav button{background:none;border:none;padding:9px 12px;font-size:14.5px;cursor:pointer;border-radius:6px;color:var(--ink)}
+  nav button.active{background:var(--accent);color:var(--brand2);font-weight:600}
+  main{max-width:1080px;margin:0 auto;padding:16px 12px 60px}
+  .tab{display:none}
+  .tab.active{display:block}
+  .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;margin-bottom:14px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px}
+  .card .lbl{font-size:12.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
+  .card .val{font-size:24px;font-weight:700;margin-top:4px}
+  .card .note{font-size:12.5px;color:var(--muted);margin-top:4px}
+  .panel{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:16px;margin-bottom:14px}
+  .panel h2{margin:0 0 10px;font-size:17px}
+  .panel h3{margin:16px 0 8px;font-size:15px}
+  form.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;align-items:end}
+  label{display:block;font-size:13px;color:var(--muted);margin-bottom:4px}
+  input,select,textarea{width:100%;box-sizing:border-box;padding:8px 9px;border:1px solid var(--line);border-radius:6px;font-size:14.5px;background:#fff;color:var(--ink)}
+  textarea{min-height:64px}
+  .btn{background:var(--brand);color:#fff;border:none;padding:9px 16px;border-radius:6px;font-size:14.5px;cursor:pointer}
+  .btn:hover{background:var(--brand2)}
+  .btn.ghost{background:#fff;color:var(--brand2);border:1px solid var(--brand)}
+  .btn.danger{background:#fff;color:var(--bad);border:1px solid var(--bad)}
+  .btn.small{padding:4px 9px;font-size:13px;min-height:40px;}
+  table{width:100%;border-collapse:collapse;font-size:14px}
+  th,td{padding:7px 8px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+  th{font-size:12.5px;text-transform:uppercase;letter-spacing:.03em;color:var(--muted)}
+  td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
+  tr.total td{font-weight:700;border-top:2px solid var(--ink);border-bottom:none}
+  .msg{font-size:13.5px;margin-top:8px;min-height:18px}
+  .msg.err{color:var(--bad)}
+  .msg.ok{color:var(--good)}
+  .flag{display:inline-block;font-size:11.5px;padding:1px 7px;border-radius:9px;background:var(--accent);color:var(--brand2)}
+  .flag.due{background:var(--warnbg);color:var(--warn)}
+  .flag.over{background:#fbe9e7;color:var(--bad)}
+  .disclaimer{background:var(--warnbg);border:1px solid #f0c9ae;border-radius:8px;padding:10px 12px;font-size:13.5px;color:#6b3410}
+  .muted{color:var(--muted);font-size:13px}
+  .rowflex{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+  .spacer{flex:1}
+  #printSheet{display:none}
+  @media (max-width:640px){
+    .panel{overflow-x:auto}
+    header h1{font-size:17px}
+    .card .val{font-size:20px}
+    th,td{padding:6px 5px;font-size:13px}
+    nav button{padding:8px 9px;font-size:13.5px}
+  }
+  @media print{
+    header,nav,main{display:none !important}
+    #printSheet{display:block !important;font-size:13px;color:#000}
+    #printSheet h1{font-size:19px;margin:0 0 4px}
+    #printSheet h2{font-size:15px;margin:18px 0 6px}
+    #printSheet table{width:100%;border-collapse:collapse}
+    #printSheet th,#printSheet td{border-bottom:1px solid #bbb;padding:5px 6px;text-align:left}
+    #printSheet td.num,#printSheet th.num{text-align:right}
+  }
+</style>
+</head>
+<body>
+<header>
+  <div class="wrap">
+    <div>
+      <h1>🚛 RigLedger</h1>
+      <div class="sub">Load, cost-per-mile &amp; IFTA tracker for owner-operators — offline, no subscription, ever.</div>
+    </div>
+    <div class="yearbox">
+      <label for="yearSel" style="color:#fde68a;margin:0">Year</label>
+      <select id="yearSel"></select>
+    </div>
+  </div>
+</header>
+<nav>
+  <div class="wrap" id="tabBar">
+    <button data-tab="dashboard" class="active">Dashboard</button>
+    <button data-tab="loads">Loads</button>
+    <button data-tab="fuel">Fuel</button>
+    <button data-tab="ifta">IFTA</button>
+    <button data-tab="expenses">Expenses</button>
+    <button data-tab="tax">Quarterly Tax</button>
+    <button data-tab="settings">Settings &amp; Backup</button>
+    <button data-tab="help">Help</button>
+  </div>
+</nav>
+<main id="app">
+
+  <!-- ============ DASHBOARD ============ -->
+  <section class="tab active" id="tab-dashboard">
+    <div class="cards">
+      <div class="card"><div class="lbl">Revenue (paid loads)</div><div class="val" id="dashRev">$0.00</div><div class="note" id="dashRevNote"></div></div>
+      <div class="card"><div class="lbl">Cost per mile (all miles)</div><div class="val" id="dashCpm">—</div><div class="note" id="dashCpmNote"></div></div>
+      <div class="card"><div class="lbl">Revenue per mile</div><div class="val" id="dashRpm">—</div><div class="note" id="dashRpmNote"></div></div>
+      <div class="card"><div class="lbl">Net profit</div><div class="val" id="dashProfit">$0.00</div><div class="note">Revenue − fuel − expenses</div></div>
+      <div class="card"><div class="lbl">Unpaid loads</div><div class="val" id="dashUnpaid">$0.00</div><div class="note" id="dashUnpaidNote"></div></div>
+      <div class="card"><div class="lbl">IFTA this quarter</div><div class="val" id="dashIfta" style="font-size:19px">—</div><div class="note" id="dashIftaNote"></div></div>
+    </div>
+    <div class="panel">
+      <h2>Getting around</h2>
+      <p style="margin:6px 0">Log every load in <b>Loads</b>, every fuel stop in <b>Fuel</b>, and every trip's miles by state in the <b>IFTA</b> tab. The <b>Expenses</b> tab holds everything except fuel (fuel lives in its own log — never double-count it). <b>Quarterly Tax</b> turns your profit into suggested estimated payments, and <b>IFTA</b> builds the quarterly summary you file.</p>
+      <p class="muted" style="margin:6px 0">A sample one-truck owner-operator's Q1 2026 books are pre-loaded so you can see how everything works — including a completed IFTA quarter you can open right now. Your real entries are never mixed up with them — samples are marked, and one button removes only the samples.</p>
+      <div class="rowflex">
+        <button class="btn ghost" id="btnClearDemoDash" type="button">Clear sample data</button>
+        <span class="msg" id="dashMsg"></span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ LOADS ============ -->
+  <section class="tab" id="tab-loads">
+    <div class="panel">
+      <h2>Add a load</h2>
+      <form class="grid" id="loadForm">
+        <div><label for="ldDate">Pickup date</label><input type="date" id="ldDate"></div>
+        <div><label for="ldBroker">Broker / shipper</label><input type="text" id="ldBroker" placeholder="e.g. TQL, Landstar"></div>
+        <div><label for="ldOrigin">Origin (city, ST)</label><input type="text" id="ldOrigin" placeholder="e.g. Tulsa, OK"></div>
+        <div><label for="ldDest">Destination (city, ST)</label><input type="text" id="ldDest" placeholder="e.g. Dallas, TX"></div>
+        <div><label for="ldPay">Load pay ($)</label><input inputmode="decimal" type="number" id="ldPay" step="0.01" min="0" placeholder="0.00"></div>
+        <div><label for="ldLoaded">Loaded miles</label><input inputmode="decimal" type="number" id="ldLoaded" step="0.1" min="0" placeholder="0"></div>
+        <div><label for="ldDead">Deadhead miles</label><input inputmode="decimal" type="number" id="ldDead" step="0.1" min="0" placeholder="0"></div>
+        <div><label for="ldCommodity">Commodity / weight (optional)</label><input type="text" id="ldCommodity" placeholder="e.g. Lumber, 38,000 lb"></div>
+        <div><label for="ldStatus">Payment status</label>
+          <select id="ldStatus">
+            <option value="pending">Pending (unpaid)</option>
+            <option value="paid">Paid</option>
+            <option value="factored">Factored (paid by factor)</option>
+          </select></div>
+        <div><label for="ldNotes">Notes</label><input type="text" id="ldNotes" placeholder="Load #, detention, lumper…"></div>
+        <div><button class="btn" id="ldAdd" type="submit">Add load</button></div>
+        <div><button class="btn ghost" id="ldCancel" type="button" style="display:none">Cancel edit</button></div>
+      </form>
+      <div class="msg" id="ldMsg"></div>
+      <p class="muted">Paid and factored loads count as income (cash basis — the money is in hand). Pending loads show in aging until paid. Per-load profit uses the year's cost per mile as an allocation estimate — see Help.</p>
+    </div>
+    <div class="panel">
+      <h2>Loads — <span class="yrLabel"></span></h2>
+      <table><thead><tr><th>Date</th><th>Broker / shipper</th><th>Route</th><th class="num">Pay</th><th class="num">Miles</th><th class="num">$/loaded mi</th><th class="num">Est. profit</th><th>Status</th><th></th></tr></thead>
+      <tbody id="ldList"></tbody>
+      <tfoot><tr class="total"><td colspan="3">Totals (paid + factored = income; pending excluded)</td><td class="num" id="ldTotalPay">$0.00</td><td class="num" id="ldTotalMiles">0</td><td></td><td class="num" id="ldTotalProfit">$0.00</td><td></td><td></td></tr></tfoot></table>
+    </div>
+    <div class="panel">
+      <h2>Unpaid load aging</h2>
+      <table><thead><tr><th>Load (broker / route)</th><th>Date</th><th class="num">Days out</th><th class="num">Amount</th></tr></thead>
+      <tbody id="ldAging"></tbody></table>
+      <p class="muted">Aging counts from the pickup date to today. Work the oldest first — a load unpaid at 60+ days is the one to call about.</p>
+    </div>
+  </section>
+
+  <!-- ============ FUEL ============ -->
+  <section class="tab" id="tab-fuel">
+    <div class="panel">
+      <h2>Add a fuel stop</h2>
+      <form class="grid" id="fuForm">
+        <div><label for="fuDate">Date</label><input type="date" id="fuDate"></div>
+        <div><label for="fuJuris">State / province purchased</label><select id="fuJuris"></select></div>
+        <div><label for="fuGallons">Gallons</label><input inputmode="decimal" type="number" id="fuGallons" step="0.01" min="0" placeholder="0.00"></div>
+        <div><label for="fuCost">Total cost ($)</label><input inputmode="decimal" type="number" id="fuCost" step="0.01" min="0" placeholder="0.00"></div>
+        <div><label for="fuOdo">Odometer (optional)</label><input inputmode="decimal" type="number" id="fuOdo" step="1" min="0" placeholder=""></div>
+        <div><label for="fuNotes">Notes</label><input type="text" id="fuNotes" placeholder="Station, DEF…"></div>
+        <div><button class="btn" id="fuAdd" type="submit">Add fuel stop</button></div>
+        <div><button class="btn ghost" id="fuCancel" type="button" style="display:none">Cancel edit</button></div>
+      </form>
+      <div class="msg" id="fuMsg"></div>
+      <p class="muted">The state where you bought the fuel is what IFTA cares about — it drives the gallons-purchased credit for that jurisdiction. Fuel cost is tracked here only; do <b>not</b> also log it in Expenses.</p>
+    </div>
+    <div class="panel">
+      <h2>Fuel stops — <span class="yrLabel"></span></h2>
+      <table><thead><tr><th>Date</th><th>State</th><th class="num">Gallons</th><th class="num">Cost</th><th class="num">$/gal</th><th>Odometer</th><th></th></tr></thead>
+      <tbody id="fuList"></tbody>
+      <tfoot><tr class="total"><td colspan="2">Totals</td><td class="num" id="fuTotalGal">0</td><td class="num" id="fuTotalCost">$0.00</td><td class="num" id="fuAvgGal">$0.00</td><td></td><td></td></tr></tfoot></table>
+      <p class="muted" id="fuPerMile"></p>
+    </div>
+  </section>
+
+  <!-- ============ IFTA ============ -->
+  <section class="tab" id="tab-ifta">
+    <div class="disclaimer"><b>IFTA rates change every quarter.</b> RigLedger ships with an <b>empty</b> rate table on purpose: type in the official rates for the quarter from your base state's IFTA rate sheet (or the IFTA rate matrix) before you trust the totals. Every jurisdiction's net is figured from the rates <i>you</i> entered — nothing here is pre-filled as fact. This worksheet is a bookkeeping aid, not a filed return.</div>
+    <div class="panel" style="margin-top:14px">
+      <h2>Quarter</h2>
+      <div class="rowflex">
+        <div style="min-width:200px"><label for="iftaQSel">IFTA quarter</label><select id="iftaQSel"></select></div>
+        <span class="muted" id="iftaDueNote"></span>
+      </div>
+    </div>
+    <div class="panel">
+      <h2>Add miles by state</h2>
+      <p class="muted">Enter the total miles you drove in each state for a trip (or a day) — the numbers off your trip sheet or ELD trip summary. These entries are your IFTA mileage record; the fuel log supplies gallons purchased by state.</p>
+      <form class="grid" id="jmForm">
+        <div><label for="jmDate">Date of travel</label><input type="date" id="jmDate"></div>
+        <div><label for="jmJuris">State / province</label><select id="jmJuris"></select></div>
+        <div><label for="jmMiles">Miles in state</label><input inputmode="decimal" type="number" id="jmMiles" step="0.1" min="0" placeholder="0"></div>
+        <div><label for="jmNote">Trip / note (optional)</label><input type="text" id="jmNote" placeholder="e.g. Tulsa → Dallas load"></div>
+        <div><button class="btn" id="jmAdd" type="submit">Add miles</button></div>
+        <div><button class="btn ghost" id="jmCancel" type="button" style="display:none">Cancel edit</button></div>
+      </form>
+      <div class="msg" id="jmMsg"></div>
+      <table><thead><tr><th>Date</th><th>State</th><th class="num">Miles</th><th>Note</th><th></th></tr></thead>
+      <tbody id="jmList"></tbody></table>
+    </div>
+    <div class="panel">
+      <h2>IFTA worksheet — <span id="iftaQLabel"></span></h2>
+      <div class="cards">
+        <div class="card"><div class="lbl">Total miles (all states)</div><div class="val" id="iftaMiles">0</div><div class="note">From miles-by-state entries</div></div>
+        <div class="card"><div class="lbl">Total gallons purchased</div><div class="val" id="iftaGallons">0</div><div class="note">From the fuel log</div></div>
+        <div class="card"><div class="lbl">Fleet MPG</div><div class="val" id="iftaMpg">—</div><div class="note">Total miles ÷ total gallons</div></div>
+        <div class="card"><div class="lbl">Net tax / (credit)</div><div class="val" id="iftaNet">$0.00</div><div class="note">Positive = you owe · negative = credit</div></div>
+      </div>
+      <table><thead><tr><th>State</th><th class="num">Miles</th><th class="num">Taxable gal (mi ÷ MPG)</th><th class="num">Gal purchased</th><th class="num">Net taxable gal</th><th>Rate $/gal (you enter)</th><th class="num">Net tax / (credit)</th></tr></thead>
+      <tbody id="iftaBody"></tbody>
+      <tfoot><tr class="total"><td>Quarter total</td><td class="num" id="iftaTotMiles">0</td><td></td><td class="num" id="iftaTotGal">0</td><td></td><td></td><td class="num" id="iftaTotNet">$0.00</td></tr></tfoot></table>
+      <p class="muted">Rates you enter are saved per quarter and per state. A state with miles or fuel but <b>no rate entered</b> shows "no rate" and is left out of the total — enter every rate on your route before filing. Each state's net is rounded to cents, then summed.</p>
+      <div class="rowflex">
+        <button class="btn" id="btnPrintIfta" type="button">Print IFTA summary</button>
+        <span class="msg" id="iftaMsg"></span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ EXPENSES ============ -->
+  <section class="tab" id="tab-expenses">
+    <div class="panel">
+      <h2>Add an expense</h2>
+      <form class="grid" id="expForm">
+        <div><label for="expDate">Date</label><input type="date" id="expDate"></div>
+        <div><label for="expCat">Category</label><select id="expCat"></select></div>
+        <div><label for="expVendor">Vendor / payee</label><input type="text" id="expVendor" placeholder="e.g. Carrier dealer, Love's"></div>
+        <div><label for="expAmount">Amount ($)</label><input inputmode="decimal" type="number" id="expAmount" step="0.01" min="0" placeholder="0.00"></div>
+        <div><label for="expNotes">Notes</label><input type="text" id="expNotes" placeholder="What was it for?"></div>
+        <div><button class="btn" id="expAdd" type="submit">Add expense</button></div>
+        <div><button class="btn ghost" id="expCancel" type="button" style="display:none">Cancel edit</button></div>
+      </form>
+      <div class="msg" id="expMsg"></div>
+      <p class="muted"><b>Fuel is NOT an expense entry</b> — it lives in the Fuel tab and is already counted in your cost per mile. Logging it here too would double-count it. Categories are tagged Fixed (due whether the wheels turn or not) or Variable (grows with miles) — that split drives your break-even.</p>
+    </div>
+    <div class="panel">
+      <h2>Expenses — <span class="yrLabel"></span></h2>
+      <table><thead><tr><th>Date</th><th>Category</th><th>Fixed / Variable</th><th>Vendor</th><th>Notes</th><th class="num">Amount</th><th></th></tr></thead>
+      <tbody id="expList"></tbody>
+      <tfoot><tr class="total"><td colspan="5">Total expenses (excl. fuel)</td><td class="num" id="expTotal">$0.00</td><td></td></tr></tfoot></table>
+    </div>
+    <div class="panel">
+      <h2>Expenses by category</h2>
+      <table><thead><tr><th>Schedule C line</th><th>Category</th><th>Fixed / Variable</th><th class="num">Total</th></tr></thead>
+      <tbody id="expByCat"></tbody>
+      <tfoot>
+        <tr><td colspan="3">Fixed costs total</td><td class="num" id="expFixedTotal">$0.00</td></tr>
+        <tr><td colspan="3">Variable costs total (excl. fuel)</td><td class="num" id="expVarTotal">$0.00</td></tr>
+      </tfoot></table>
+    </div>
+    <div class="panel">
+      <h2>Cost per mile &amp; break-even — <span class="yrLabel"></span></h2>
+      <table>
+        <tr><td>Total miles (loaded + deadhead, all loads)</td><td class="num" id="cpmMiles">0</td></tr>
+        <tr><td>Fuel cost</td><td class="num" id="cpmFuel">$0.00</td></tr>
+        <tr><td>Expenses (excl. fuel)</td><td class="num" id="cpmExp">$0.00</td></tr>
+        <tr><td>Total cost</td><td class="num" id="cpmCost">$0.00</td></tr>
+        <tr><td>Fixed cost per mile</td><td class="num" id="cpmFixed">—</td></tr>
+        <tr><td>Variable cost per mile (incl. fuel)</td><td class="num" id="cpmVar">—</td></tr>
+        <tr class="total"><td>True cost per mile = break-even rate per mile</td><td class="num" id="cpmTotal">—</td></tr>
+        <tr><td>Revenue per loaded mile</td><td class="num" id="cpmRevLoaded">—</td></tr>
+        <tr><td>Revenue per all miles</td><td class="num" id="cpmRevAll">—</td></tr>
+      </table>
+      <p class="muted">Break-even is the rate per mile below which a load loses money at this year's costs. Rule of thumb: quote above break-even on <i>all</i> miles (loaded + deadhead), not just loaded miles — deadhead burns the same fuel.</p>
+    </div>
+  </section>
+
+  <!-- ============ QUARTERLY TAX ============ -->
+  <section class="tab" id="tab-tax">
+    <div class="disclaimer"><b>Planning estimates only — not tax advice.</b> This worksheet uses simplified math (see Help for the exact formulas and what's left out). Your real bill depends on your whole tax picture. Confirm amounts with a tax professional before paying.</div>
+    <div class="panel" style="margin-top:14px">
+      <h2>Estimated tax on <span class="yrLabel"></span> profit — "if the year ended today"</h2>
+      <table>
+        <tr><td>Year-to-date net profit (paid loads − fuel − expenses)</td><td class="num" id="taxProfit">$0.00</td></tr>
+        <tr><td>Self-employment tax base (profit × 92.35%)</td><td class="num" id="taxSeBase">$0.00</td></tr>
+        <tr><td>Self-employment tax (base × 15.3%)</td><td class="num" id="taxSeTax">$0.00</td></tr>
+        <tr><td>Half-SE-tax deduction (reduces income tax below)</td><td class="num" id="taxHalf">$0.00</td></tr>
+        <tr><td>Federal income tax estimate ((profit − half SE) × <span id="taxFedRateLbl">12</span>%)</td><td class="num" id="taxFed">$0.00</td></tr>
+        <tr><td>State income tax estimate (profit × <span id="taxStateRateLbl">0</span>%)</td><td class="num" id="taxState">$0.00</td></tr>
+        <tr class="total"><td>Total estimated tax for the year</td><td class="num" id="taxTotal">$0.00</td></tr>
+        <tr><td>Suggested payment per quarter (total ÷ 4)</td><td class="num" id="taxQuarterly">$0.00</td></tr>
+      </table>
+      <p class="muted">The federal and state percentages are <i>your</i> planning inputs — set them in Settings &amp; Backup. They are effective-rate guesses, not tax tables.</p>
+    </div>
+    <div class="panel">
+      <h2>Quarter-by-quarter worksheet</h2>
+      <p class="muted">Each quarter annualizes your profit through that quarter's end (profit so far × 4 ÷ quarters elapsed) and works out the cumulative share of the year's estimated tax that should be paid by that due date. Type what you've already paid in the "Paid" column.</p>
+      <table><thead><tr><th>Quarter</th><th>Due date</th><th class="num">Profit thru qtr end</th><th class="num">Annualized</th><th class="num">Cum. due</th><th class="num">Suggested this qtr</th><th class="num">Paid</th><th class="num">Balance</th></tr></thead>
+      <tbody id="taxQBody"></tbody></table>
+      <div class="rowflex" style="margin-top:12px">
+        <button class="btn ghost" id="btnPrintTax" type="button">Print worksheet</button>
+        <span class="msg" id="taxMsg"></span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ SETTINGS & BACKUP ============ -->
+  <section class="tab" id="tab-settings">
+    <div class="panel">
+      <h2>Truck, business &amp; tax settings</h2>
+      <form class="grid" id="setForm">
+        <div><label for="setBiz">Business name</label><input type="text" id="setBiz" placeholder="e.g. Pine Ridge Trucking LLC"></div>
+        <div><label for="setOwner">Owner-operator name</label><input type="text" id="setOwner" placeholder="Your name"></div>
+        <div><label for="setTruck">Truck (year / make / unit #)</label><input type="text" id="setTruck" placeholder="e.g. 2021 Peterbilt 389 — Unit 1"></div>
+        <div><label for="setBase">Base jurisdiction (IFTA)</label><select id="setBase"></select></div>
+        <div><label for="setFed">Federal effective rate % (planning)</label><input inputmode="decimal" type="number" id="setFed" step="0.1" min="0" max="60"></div>
+        <div><label for="setState">State effective rate % (planning)</label><input inputmode="decimal" type="number" id="setState" step="0.1" min="0" max="30"></div>
+        <div><button class="btn" id="setSave" type="submit">Save settings</button></div>
+      </form>
+      <div class="msg" id="setMsg"></div>
+    </div>
+    <div class="panel">
+      <h2>Backup &amp; restore</h2>
+      <p class="muted">Your data lives only in this browser on this device. Export a backup file regularly — it's the only copy. Importing replaces everything currently in the app with the backup's contents. Backups from other apps in this product line are rejected — a backup can never overwrite the wrong book.</p>
+      <div class="rowflex">
+        <button class="btn" id="btnExport" type="button">Export backup (JSON)</button>
+        <label class="btn ghost" style="cursor:pointer">Import from file<input type="file" id="importFile" accept=".json,application/json" style="display:none"></label>
+      </div>
+      <label for="importText" style="margin-top:12px">…or paste backup JSON here</label>
+      <textarea id="importText" placeholder="Paste the contents of a RigLedger backup file"></textarea>
+      <div class="rowflex" style="margin-top:8px">
+        <button class="btn ghost" id="btnImportText" type="button">Import pasted backup</button>
+        <span class="msg" id="importMsg"></span>
+      </div>
+    </div>
+    <div class="panel">
+      <h2>Sample data &amp; erase</h2>
+      <div class="rowflex">
+        <button class="btn ghost" id="btnClearDemo" type="button">Clear sample data only</button>
+        <button class="btn danger" id="btnEraseAll" type="button">Erase EVERYTHING</button>
+        <span class="msg" id="dataMsg"></span>
+      </div>
+      <p class="muted">"Erase EVERYTHING" deletes all entries and settings from this browser and starts the app empty. It cannot be undone — export a backup first if there's anything you want.</p>
+    </div>
+  </section>
+
+  <!-- ============ HELP ============ -->
+  <section class="tab" id="tab-help">
+    <div class="panel">
+      <h2>How RigLedger works</h2>
+      <h3>The idea</h3>
+      <p>One file, no account, no subscription, no per-truck monthly meter — your books never leave this device. Log loads, fuel stops, and miles by state as you run; RigLedger keeps your true cost per mile, your break-even rate, who's paid and who hasn't, your quarterly IFTA worksheet, and your estimated taxes current.</p>
+      <h3>Income: cash basis</h3>
+      <p>A load counts as income when the money is in hand: status <b>Paid</b> or <b>Factored</b>. Factoring fees you pay go in Expenses (Factoring fees). <b>Pending</b> loads are receivables — they show in aging, not in profit. If your business files taxes on the accrual method, tell your preparer this app's timing.</p>
+      <h3>Cost per mile &amp; break-even</h3>
+      <p><b>Total cost</b> = all fuel (Fuel tab) + all expenses (Expenses tab — fuel is never entered there, so nothing double-counts). <b>Cost per mile</b> = total cost ÷ total miles, where total miles = loaded + deadhead across all loads in the year. Your <b>break-even rate</b> is the same number: a load paid below it loses money at current costs. <b>Fixed CPM</b> = fixed costs ÷ miles (insurance, lease, permits, phone — due whether you roll or not); <b>variable CPM</b> = (fuel + variable expenses) ÷ miles. <b>Per-load profit</b> = load pay − (that load's total miles × the year's CPM). It's an allocation estimate — the year's average cost spread over the load's miles — not a trip-level accounting. Deadhead miles are fully counted: they burn fuel and tires exactly like loaded ones.</p>
+      <h3>IFTA worksheet</h3>
+      <p>Per quarter: <b>fleet MPG</b> = total miles in all jurisdictions (your miles-by-state entries) ÷ total gallons purchased in all jurisdictions (your Fuel log). For each jurisdiction: <b>taxable gallons</b> = jurisdiction miles ÷ fleet MPG; <b>net taxable gallons</b> = taxable gallons − gallons purchased in that jurisdiction; <b>net tax</b> = net taxable gallons × <i>the rate you entered for that jurisdiction and quarter</i>. Each jurisdiction's net is rounded to cents, then summed for the quarter total. A positive total is tax due; negative is a credit. IFTA tax rates are set by each jurisdiction and <b>change quarterly</b> — that's why the rate table ships empty: enter the quarter's official rates (your base state's IFTA return packet or the IFTA rate matrix) before filing. Rates are stored per quarter, so last quarter's rates never leak into this quarter's return. This worksheet prepares your numbers; you still file the official return with your base jurisdiction. Not tax advice.</p>
+      <h3>Estimated taxes</h3>
+      <p><b>Net profit</b> = paid/factored load revenue − fuel − expenses. <b>Self-employment tax</b> = profit × 92.35% × 15.3%. Half of that is deducted before the federal income-tax estimate: <b>federal</b> = (profit − half SE) × your federal effective-rate %. <b>State</b> = profit × your state %. Quarterly suggestions annualize your profit through each quarter's end, the standard safe-harbor style planning approach.</p>
+      <h3>What's NOT in these estimates</h3>
+      <p>Planning worksheets, not a tax return and not tax advice. Left out: the Social Security wage-base cap, the standard deduction and real tax brackets (that's why you supply an <i>effective</i> rate), per-diem deductions, depreciation of the truck, other income, W-2 wages, and credits. A tax professional who knows trucking will beat these worksheets — use them to avoid surprises and underpayment penalties, not as your final number.</p>
+      <h3>Your data</h3>
+      <p>Everything is stored in this browser's local storage on this device only. Clearing your browser's site data erases it — export backups from Settings &amp; Backup and keep the file somewhere safe. A backup from this app can be re-imported into any copy of RigLedger.</p>
+    </div>
+  </section>
+</main>
+<div id="printSheet"></div>
+
+<script>
+"use strict";
+/* ================= RigLedger ================= */
+var KEY = "rigledger.v1";
+var JURIS = [
+  ["OK","Oklahoma"],["TX","Texas"],["KS","Kansas"],["AL","Alabama"],["AK","Alaska"],["AZ","Arizona"],["AR","Arkansas"],["CA","California"],["CO","Colorado"],["CT","Connecticut"],["DE","Delaware"],["DC","District of Columbia"],["FL","Florida"],["GA","Georgia"],["HI","Hawaii"],["ID","Idaho"],["IL","Illinois"],["IN","Indiana"],["IA","Iowa"],["KY","Kentucky"],["LA","Louisiana"],["ME","Maine"],["MD","Maryland"],["MA","Massachusetts"],["MI","Michigan"],["MN","Minnesota"],["MS","Mississippi"],["MO","Missouri"],["MT","Montana"],["NE","Nebraska"],["NV","Nevada"],["NH","New Hampshire"],["NJ","New Jersey"],["NM","New Mexico"],["NY","New York"],["NC","North Carolina"],["ND","North Dakota"],["OH","Ohio"],["OR","Oregon"],["PA","Pennsylvania"],["RI","Rhode Island"],["SC","South Carolina"],["SD","South Dakota"],["TN","Tennessee"],["UT","Utah"],["VT","Vermont"],["VA","Virginia"],["WA","Washington"],["WV","West Virginia"],["WI","Wisconsin"],["WY","Wyoming"],
+  ["AB","Alberta"],["BC","British Columbia"],["MB","Manitoba"],["NB","New Brunswick"],["NL","Newfoundland & Labrador"],["NS","Nova Scotia"],["ON","Ontario"],["PE","Prince Edward Island"],["QC","Quebec"],["SK","Saskatchewan"]
+];
+var JURMAP = {}; JURIS.forEach(function(j){ JURMAP[j[0]]=j[1]; });
+var CATS = [
+  {key:"insurance", label:"Insurance", line:"15", fixed:true},
+  {key:"lease", label:"Truck / trailer lease payments", line:"20", fixed:true},
+  {key:"permits", label:"Permits & licenses", line:"23", fixed:true},
+  {key:"phone", label:"Phone & dispatch", line:"25", fixed:true},
+  {key:"repairs", label:"Maintenance & repairs", line:"21", fixed:false},
+  {key:"tires", label:"Tires", line:"27a", fixed:false},
+  {key:"tolls", label:"Tolls & scales", line:"27a", fixed:false},
+  {key:"factoring", label:"Factoring fees", line:"10", fixed:false},
+  {key:"other", label:"Other expenses", line:"27a", fixed:false}
+];
+var CATMAP = {}; CATS.forEach(function(c){ CATMAP[c.key]=c; });
+var MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+var QDEFS = [
+  {q:1, endMonth:3,  due:"Apr 15"},
+  {q:2, endMonth:6,  due:"Jun 15"},
+  {q:3, endMonth:9,  due:"Sep 15"},
+  {q:4, endMonth:12, due:"Jan 15"}
+];
+
+var _uid = 0;
+function uid(){ _uid++; return "r"+Date.now().toString(36)+_uid.toString(36)+Math.floor(Math.random()*1e6).toString(36); }
+function esc(s){ return String(s==null?"":s).replace(/[&<>"']/g, function(ch){ return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[ch]; }); }
+function round2(x){ return Math.round((Number(x)||0)*100)/100; }
+function fmt(x){ var v = round2(x); var neg = v<0; var s = Math.abs(v).toLocaleString("en-US",{minimumFractionDigits:2, maximumFractionDigits:2}); return (neg?"-$":"$")+s; }
+function fmtNum(x){ var v = Math.round((Number(x)||0)*10)/10; return v.toLocaleString("en-US",{minimumFractionDigits:0, maximumFractionDigits:1}); }
+function num(v){ var n = parseFloat(v); if(!isFinite(n)) return 0; if(n>999999999) n=999999999; if(n<-999999999) n=-999999999; return n; }
+function amt(v){ var n = num(v); return n<0?0:n; }
+function validDate(s){
+  if(typeof s!=="string") return false;
+  var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s); if(!m) return false;
+  var y=+m[1], mo=+m[2], d=+m[3];
+  if(mo<1||mo>12||d<1||d>31) return false;
+  var dt = new Date(Date.UTC(y, mo-1, d));
+  return dt.getUTCFullYear()===y && dt.getUTCMonth()===mo-1 && dt.getUTCDate()===d;
+}
+function yearOf(s){ return validDate(s) ? +s.slice(0,4) : null; }
+function monthOf(s){ return validDate(s) ? +s.slice(5,7) : null; }
+function quarterOf(s){ var m = monthOf(s); return m ? Math.floor((m-1)/3)+1 : null; }
+function qKey(year, q){ return year+"-Q"+q; }
+function todayStr(){ var d=new Date(); function p(n){return (n<10?"0":"")+n;} return d.getFullYear()+"-"+p(d.getMonth()+1)+"-"+p(d.getDate()); }
+function daysBetween(a, b){ var da = Date.UTC(+a.slice(0,4), +a.slice(5,7)-1, +a.slice(8,10)); var db = Date.UTC(+b.slice(0,4), +b.slice(5,7)-1, +b.slice(8,10)); return Math.round((db-da)/86400000); }
+
+function defaultSettings(){
+  return { bizName:"", ownerName:"", truck:"", baseJuris:"OK", fedRate:12, stateRate:0 };
+}
+function blankState(){
+  return { app:"rigledger", settings: defaultSettings(), loads:[], fuel:[], expenses:[], jurisMiles:[], iftaRates:{}, estPayments:{}, meta:{seeded:true, demoCleared:false} };
+}
+function seedDemo(){
+  var st = blankState();
+  st.settings.bizName = "Sample — Red Dirt Hauling (demo)";
+  st.settings.ownerName = "Demo Owner-Operator";
+  st.settings.truck = "2021 Peterbilt 389 — Unit 1";
+  st.settings.baseJuris = "OK";
+  var loads = [
+    ["2026-01-12","TQL","Tulsa, OK","Dallas, TX",3000,1200,100,"Lumber, 38,000 lb","paid","Load #100241"],
+    ["2026-02-09","Landstar","Oklahoma City, OK","Kansas City, KS",1800,800,50,"Auto parts, 22,000 lb","paid","Load #88-3117"]
+  ];
+  loads.forEach(function(r){ st.loads.push({id:uid(), date:r[0], broker:r[1], origin:r[2], dest:r[3], pay:r[4], loaded:r[5], deadhead:r[6], commodity:r[7], status:r[8], notes:r[9], demo:true}); });
+  var fuel = [
+    ["2026-01-12","OK",120,410,512300,"Love's — Tulsa"],
+    ["2026-01-14","TX",100,345,513550,"Petro — Dallas"],
+    ["2026-02-09","OK",80,275,514400,"Flying J — OKC"],
+    ["2026-02-11","KS",50,170,515200,"Kwik Trip — Kansas City"]
+  ];
+  fuel.forEach(function(r){ st.fuel.push({id:uid(), date:r[0], juris:r[1], gallons:r[2], cost:r[3], odometer:r[4], notes:r[5], demo:true}); });
+  var jm = [
+    ["2026-01-12","OK",650,"Tulsa → Dallas load"],
+    ["2026-01-13","TX",650,"Tulsa → Dallas load"],
+    ["2026-02-09","OK",350,"OKC → Kansas City load"],
+    ["2026-02-10","TX",150,"OKC → Kansas City load"],
+    ["2026-02-10","KS",350,"OKC → Kansas City load"]
+  ];
+  jm.forEach(function(r){ st.jurisMiles.push({id:uid(), date:r[0], juris:r[1], miles:r[2], note:r[3], demo:true}); });
+  var exp = [
+    ["2026-01-05","insurance","Progressive Commercial",600,"Monthly premium"],
+    ["2026-02-18","repairs","Peterbilt of Tulsa",430,"Brake job — drive axle"],
+    ["2026-02-20","tolls","Turnpike / PrePass",70,"OK + KS tolls"]
+  ];
+  exp.forEach(function(r){ st.expenses.push({id:uid(), date:r[0], cat:r[1], vendor:r[2], amount:r[3], notes:r[4], demo:true}); });
+  return st;
+}
+
+var state = null;
+function save(){ try{ localStorage.setItem(KEY, JSON.stringify(state)); }catch(e){} }
+function load(){
+  var raw = null;
+  try{ raw = localStorage.getItem(KEY); }catch(e){}
+  if(!raw){ state = seedDemo(); save(); return; }
+  try{
+    var parsed = JSON.parse(raw);
+    state = sanitizeState(parsed);
+    if(!state){ throw new Error("bad shape"); }
+  }catch(e){
+    try{ localStorage.setItem(KEY+".corrupt", raw); }catch(e2){}
+    state = seedDemo(); save();
+  }
+}
+function sanitizeState(p){
+  if(!p || typeof p!=="object") return null;
+  var st = blankState();
+  if(p && p.legal && typeof p.legal==="object") st.legal = { termsVersion: String(p.legal.termsVersion || ""), acceptedDate: String(p.legal.acceptedDate || ""), disclaimerShown: !!p.legal.disclaimerShown };
+  var s = (p.settings && typeof p.settings==="object") ? p.settings : {};
+  st.settings.bizName = String(s.bizName||"").slice(0,120);
+  st.settings.ownerName = String(s.ownerName||"").slice(0,120);
+  st.settings.truck = String(s.truck||"").slice(0,120);
+  st.settings.baseJuris = JURMAP[s.baseJuris] ? s.baseJuris : "OK";
+  st.settings.fedRate = Math.min(60, Math.max(0, num(s.fedRate==null?12:s.fedRate)));
+  st.settings.stateRate = Math.min(30, Math.max(0, num(s.stateRate==null?0:s.stateRate)));
+  st.loads = sanitizeLoads(p.loads);
+  st.fuel = sanitizeFuel(p.fuel);
+  st.expenses = sanitizeExpenses(p.expenses);
+  st.jurisMiles = sanitizeJurisMiles(p.jurisMiles);
+  st.iftaRates = {};
+  if(p.iftaRates && typeof p.iftaRates==="object"){
+    Object.keys(p.iftaRates).forEach(function(qk){
+      if(!/^\d{4}-Q[1-4]$/.test(qk)) return;
+      var bucket = p.iftaRates[qk];
+      if(!bucket || typeof bucket!=="object") return;
+      var out = {};
+      Object.keys(bucket).forEach(function(j){ if(JURMAP[j]){ var v = num(bucket[j]); if(v>=0 && v<=10) out[j]=v; } });
+      if(Object.keys(out).length) st.iftaRates[qk]=out;
+    });
+  }
+  st.estPayments = {};
+  if(p.estPayments && typeof p.estPayments==="object"){
+    Object.keys(p.estPayments).forEach(function(k){ if(/^\d{4}-Q[1-4]$/.test(k)) st.estPayments[k] = amt(p.estPayments[k]); });
+  }
+  st.meta = { seeded:true, demoCleared: !!(p.meta && p.meta.demoCleared) };
+  return st;
+}
+function sanitizeLoads(list){
+  if(!Array.isArray(list)) return [];
+  var out=[];
+  list.forEach(function(r){
+    if(!r || !validDate(r.date)) return;
+    var status = ["paid","pending","factored"].indexOf(r.status)>=0 ? r.status : "pending";
+    out.push({ id: String(r.id||uid()), date:r.date, broker:String(r.broker||"").slice(0,120), origin:String(r.origin||"").slice(0,120), dest:String(r.dest||"").slice(0,120), pay:amt(r.pay), loaded:amt(r.loaded), deadhead:amt(r.deadhead), commodity:String(r.commodity||"").slice(0,200), status:status, notes:String(r.notes||"").slice(0,300), demo:!!r.demo });
+  });
+  return out;
+}
+function sanitizeFuel(list){
+  if(!Array.isArray(list)) return [];
+  var out=[];
+  list.forEach(function(r){
+    if(!r || !validDate(r.date)) return;
+    var j = JURMAP[r.juris] ? r.juris : "OK";
+    out.push({ id: String(r.id||uid()), date:r.date, juris:j, gallons:amt(r.gallons), cost:amt(r.cost), odometer:amt(r.odometer), notes:String(r.notes||"").slice(0,300), demo:!!r.demo });
+  });
+  return out;
+}
+function sanitizeExpenses(list){
+  if(!Array.isArray(list)) return [];
+  var out=[];
+  list.forEach(function(r){
+    if(!r || !validDate(r.date)) return;
+    var cat = CATMAP[r.cat] ? r.cat : "other";
+    out.push({ id: String(r.id||uid()), date:r.date, cat:cat, vendor:String(r.vendor||"").slice(0,120), amount:amt(r.amount), notes:String(r.notes||"").slice(0,300), demo:!!r.demo });
+  });
+  return out;
+}
+function sanitizeJurisMiles(list){
+  if(!Array.isArray(list)) return [];
+  var out=[];
+  list.forEach(function(r){
+    if(!r || !validDate(r.date)) return;
+    var j = JURMAP[r.juris] ? r.juris : "OK";
+    out.push({ id: String(r.id||uid()), date:r.date, juris:j, miles:amt(r.miles), note:String(r.note||"").slice(0,300), demo:!!r.demo });
+  });
+  return out;
+}
+
+/* ---------- computations ---------- */
+function isIncomeLoad(l){ return l.status==="paid" || l.status==="factored"; }
+function totalsForYear(year){
+  var t = { revenue:0, pendingTotal:0, pendingCount:0, loadedMiles:0, deadheadMiles:0, totalMiles:0,
+            fuelCost:0, fuelGal:0, expTotal:0, expFixed:0, expVar:0, byCat:{}, loadCount:0 };
+  CATS.forEach(function(c){ t.byCat[c.key]=0; });
+  state.loads.forEach(function(l){
+    if(yearOf(l.date)!==year) return;
+    t.loadCount++;
+    t.loadedMiles = round2(t.loadedMiles + l.loaded);
+    t.deadheadMiles = round2(t.deadheadMiles + l.deadhead);
+    if(isIncomeLoad(l)){ t.revenue = round2(t.revenue + l.pay); }
+    else { t.pendingTotal = round2(t.pendingTotal + l.pay); t.pendingCount++; }
+  });
+  state.fuel.forEach(function(f){
+    if(yearOf(f.date)!==year) return;
+    t.fuelCost = round2(t.fuelCost + f.cost);
+    t.fuelGal = round2(t.fuelGal + f.gallons);
+  });
+  state.expenses.forEach(function(r){
+    if(yearOf(r.date)!==year) return;
+    t.expTotal = round2(t.expTotal + r.amount);
+    t.byCat[r.cat] = round2(t.byCat[r.cat] + r.amount);
+    if(CATMAP[r.cat].fixed) t.expFixed = round2(t.expFixed + r.amount); else t.expVar = round2(t.expVar + r.amount);
+  });
+  t.totalMiles = round2(t.loadedMiles + t.deadheadMiles);
+  t.totalCost = round2(t.fuelCost + t.expTotal);
+  t.profit = round2(t.revenue - t.totalCost);
+  t.cpm = t.totalMiles>0 ? t.totalCost / t.totalMiles : 0;
+  t.cpmFixed = t.totalMiles>0 ? t.expFixed / t.totalMiles : 0;
+  t.cpmVar = t.totalMiles>0 ? (t.fuelCost + t.expVar) / t.totalMiles : 0;
+  t.rpmAll = t.totalMiles>0 ? t.revenue / t.totalMiles : 0;
+  t.rpmLoaded = t.loadedMiles>0 ? t.revenue / t.loadedMiles : 0;
+  t.fuelCpm = t.totalMiles>0 ? t.fuelCost / t.totalMiles : 0;
+  t.avgPerGal = t.fuelGal>0 ? t.fuelCost / t.fuelGal : 0;
+  return t;
+}
+function iftaForQuarter(year, q){
+  var milesBy = {}, galBy = {}, totMiles = 0, totGal = 0;
+  state.jurisMiles.forEach(function(r){
+    if(yearOf(r.date)!==year || quarterOf(r.date)!==q) return;
+    milesBy[r.juris] = round2((milesBy[r.juris]||0) + r.miles);
+    totMiles = round2(totMiles + r.miles);
+  });
+  state.fuel.forEach(function(f){
+    if(yearOf(f.date)!==year || quarterOf(f.date)!==q) return;
+    galBy[f.juris] = round2((galBy[f.juris]||0) + f.gallons);
+    totGal = round2(totGal + f.gallons);
+  });
+  var mpg = totGal>0 ? totMiles / totGal : 0;
+  var rates = state.iftaRates[qKey(year,q)] || {};
+  var seen = {};
+  Object.keys(milesBy).forEach(function(j){ seen[j]=true; });
+  Object.keys(galBy).forEach(function(j){ seen[j]=true; });
+  Object.keys(rates).forEach(function(j){ seen[j]=true; });
+  var rows = Object.keys(seen).sort().map(function(j){
+    var miles = milesBy[j]||0, purch = galBy[j]||0;
+    var taxable = mpg>0 ? miles / mpg : 0;
+    var netGal = taxable - purch;
+    var hasRate = typeof rates[j]==="number";
+    var net = hasRate ? round2(netGal * rates[j]) : null;
+    return { juris:j, miles:miles, taxableGal:taxable, purchGal:purch, netGal:netGal, rate:hasRate?rates[j]:null, net:net };
+  });
+  var totalNet = 0, anyRate = false;
+  rows.forEach(function(r){ if(r.net!==null){ totalNet = round2(totalNet + r.net); anyRate = true; } });
+  return { totalMiles:totMiles, totalGal:totGal, mpg:mpg, rows:rows, totalNet:totalNet, anyRate:anyRate };
+}
+function profitThrough(year, endMonth){
+  var rev=0, cost=0;
+  state.loads.forEach(function(l){ if(yearOf(l.date)===year && monthOf(l.date)<=endMonth && isIncomeLoad(l)) rev+=l.pay; });
+  state.fuel.forEach(function(f){ if(yearOf(f.date)===year && monthOf(f.date)<=endMonth) cost+=f.cost; });
+  state.expenses.forEach(function(r){ if(yearOf(r.date)===year && monthOf(r.date)<=endMonth) cost+=r.amount; });
+  return round2(rev - cost);
+}
+function taxFromProfit(profit){
+  var p = Math.max(0, profit||0);
+  var seBase = p*0.9235;
+  var seTax = seBase*0.153;
+  var half = seTax/2;
+  var fed = Math.max(0, p - half) * (state.settings.fedRate/100);
+  var stTax = p * (state.settings.stateRate/100);
+  var total = seTax + fed + stTax;
+  return { profit:p, seBase:round2(seBase), seTax:round2(seTax), half:round2(half), fed:round2(fed), state:round2(stTax), total:round2(total), quarterly:round2(total/4) };
+}
+function quarterTable(year){
+  var rows=[], prevCum=0;
+  QDEFS.forEach(function(qd){
+    var thru = profitThrough(year, qd.endMonth);
+    var annual = round2(thru * 4 / qd.q);
+    var tax = taxFromProfit(annual);
+    var cumDue = round2(tax.total * qd.q / 4);
+    var suggested = round2(cumDue - prevCum); prevCum = cumDue;
+    var paid = state.estPayments[year+"-Q"+qd.q] || 0;
+    rows.push({ q:qd.q, dueLabel: qd.due + (qd.q===4 ? ", "+(year+1) : ", "+year), thru:thru, annual:annual, cumDue:cumDue, suggested:suggested, paid:paid, balance:round2(suggested-paid) });
+  });
+  return rows;
+}
+
+/* ---------- UI ---------- */
+function $(id){ return document.getElementById(id); }
+var uiYear = new Date().getFullYear();
+var uiIfta = null; /* {year, q} */
+function yearsPresent(){
+  var set = {};
+  set[new Date().getFullYear()] = true; set[uiYear] = true;
+  state.loads.concat(state.fuel, state.expenses, state.jurisMiles).forEach(function(r){ var y=yearOf(r.date); if(y) set[y]=true; });
+  return Object.keys(set).map(Number).sort(function(a,b){return a-b;});
+}
+function defaultIftaQuarter(){
+  var best = null;
+  state.jurisMiles.concat(state.fuel).forEach(function(r){
+    var y = yearOf(r.date), q = quarterOf(r.date);
+    if(!y || !q) return;
+    if(!best || y>best.year || (y===best.year && q>best.q)) best = {year:y, q:q};
+  });
+  if(best) return best;
+  var now = new Date();
+  return { year: now.getFullYear(), q: Math.floor(now.getMonth()/3)+1 };
+}
+function fillYearSel(){
+  var sel = $("yearSel"); sel.innerHTML = "";
+  yearsPresent().forEach(function(y){
+    var o = document.createElement("option"); o.value=y; o.textContent=y; if(y===uiYear) o.selected=true; sel.appendChild(o);
+  });
+  Array.prototype.forEach.call(document.querySelectorAll(".yrLabel"), function(el){ el.textContent = uiYear; });
+}
+function fillIftaQSel(){
+  if(!uiIfta) uiIfta = defaultIftaQuarter();
+  var sel = $("iftaQSel"); sel.innerHTML = "";
+  var years = yearsPresent().slice().sort(function(a,b){return b-a;});
+  years.forEach(function(y){
+    [4,3,2,1].forEach(function(q){
+      var o = document.createElement("option");
+      o.value = y+"-Q"+q;
+      o.textContent = "Q"+q+" "+y+" ("+MONTHS[(q-1)*3].slice(0,3)+"–"+MONTHS[(q-1)*3+2].slice(0,3)+")";
+      if(y===uiIfta.year && q===uiIfta.q) o.selected = true;
+      sel.appendChild(o);
+    });
+  });
+  var dueMap = {1:"Apr 30", 2:"Jul 31", 3:"Oct 31", 4:"Jan 31"};
+  $("iftaDueNote").textContent = "Q"+uiIfta.q+" "+uiIfta.year+" return due "+dueMap[uiIfta.q]+(uiIfta.q===4 ? ", "+(uiIfta.year+1) : ", "+uiIfta.year)+" — file with your base jurisdiction ("+(JURMAP[state.settings.baseJuris]||state.settings.baseJuris)+").";
+  $("iftaQLabel").textContent = "Q"+uiIfta.q+" "+uiIfta.year;
+}
+function showTab(name){
+  Array.prototype.forEach.call(document.querySelectorAll("#tabBar button"), function(b){ b.classList.toggle("active", b.getAttribute("data-tab")===name); });
+  Array.prototype.forEach.call(document.querySelectorAll(".tab"), function(s){ s.classList.toggle("active", s.id==="tab-"+name); });
+}
+function sortByDate(list){ return list.slice().sort(function(a,b){ return a.date<b.date?-1:(a.date>b.date?1:0); }); }
+function statusFlag(l){
+  if(l.status==="paid") return '<span class="flag">Paid</span>';
+  if(l.status==="factored") return '<span class="flag">Factored</span>';
+  var d = daysBetween(l.date, todayStr());
+  if(d>60) return '<span class="flag over">Pending '+d+'d</span>';
+  if(d>30) return '<span class="flag due">Pending '+d+'d</span>';
+  return '<span class="flag due">Pending</span>';
+}
+function render(){
+  fillYearSel();
+  fillIftaQSel();
+  var t = totalsForYear(uiYear);
+  /* dashboard */
+  $("dashRev").textContent = fmt(t.revenue);
+  $("dashRevNote").textContent = t.loadCount + (t.loadCount===1?" load":" loads") + " logged in " + uiYear + " · " + fmtNum(t.totalMiles) + " total miles";
+  $("dashCpm").textContent = t.totalMiles>0 ? fmt(t.cpm) : "—";
+  $("dashCpmNote").textContent = t.totalMiles>0 ? ("Break-even rate · fixed " + fmt(t.cpmFixed) + " + variable " + fmt(t.cpmVar)) : "Log loads and costs to see it";
+  $("dashRpm").textContent = t.totalMiles>0 ? fmt(t.rpmAll) : "—";
+  $("dashRpmNote").textContent = t.loadedMiles>0 ? (fmt(t.rpmLoaded) + " per loaded mile · " + fmtNum(t.deadheadMiles) + " deadhead miles") : "";
+  $("dashProfit").textContent = fmt(t.profit);
+  $("dashUnpaid").textContent = fmt(t.pendingTotal);
+  $("dashUnpaidNote").textContent = t.pendingCount ? (t.pendingCount + (t.pendingCount===1?" load":" loads") + " still pending") : "Nothing outstanding";
+  var now = new Date();
+  var cq = iftaForQuarter(now.getFullYear(), Math.floor(now.getMonth()/3)+1);
+  if(cq.totalMiles>0 && cq.anyRate){ $("dashIfta").textContent = fmt(cq.totalNet); $("dashIftaNote").textContent = "Q"+(Math.floor(now.getMonth()/3)+1)+" "+now.getFullYear()+" · "+fmtNum(cq.totalMiles)+" miles · "+(cq.totalNet>=0?"tax due":"credit")+" at rates you entered"; }
+  else if(cq.totalMiles>0){ $("dashIfta").textContent = fmtNum(cq.totalMiles)+" miles"; $("dashIftaNote").textContent = "Q"+(Math.floor(now.getMonth()/3)+1)+" "+now.getFullYear()+" — enter this quarter's official rates in the IFTA tab to see the tax"; }
+  else { $("dashIfta").textContent = "No miles yet"; $("dashIftaNote").textContent = "Log miles by state in the IFTA tab as you run"; }
+  renderLoads(t);
+  renderFuel(t);
+  renderIfta();
+  renderExpenses(t);
+  renderTax(t);
+  renderSettings();
+}
+function renderLoads(t){
+  var cpm = t.cpm;
+  var loads = sortByDate(state.loads.filter(function(l){ return yearOf(l.date)===uiYear; }));
+  $("ldList").innerHTML = loads.length ? loads.map(function(l){
+    var miles = round2(l.loaded + l.deadhead);
+    var perLoaded = l.loaded>0 ? fmt(l.pay / l.loaded) : "—";
+    var profit = isIncomeLoad(l) && cpm>0 ? fmt(l.pay - miles*cpm) : (isIncomeLoad(l) ? fmt(l.pay) : '<span class="muted">pending</span>');
+    return "<tr><td>"+esc(l.date)+"</td><td>"+esc(l.broker)+(l.demo?' <span class="flag">sample</span>':"")+(l.commodity?'<br><span class="muted">'+esc(l.commodity)+"</span>":"")+"</td><td>"+esc(l.origin)+" → "+esc(l.dest)+"</td><td class=\"num\">"+fmt(l.pay)+"</td><td class=\"num\">"+fmtNum(miles)+'<br><span class="muted">'+fmtNum(l.loaded)+" loaded / "+fmtNum(l.deadhead)+" dh</span></td><td class=\"num\">"+perLoaded+"</td><td class=\"num\">"+profit+"</td><td>"+statusFlag(l)+"<br><button class=\"btn small ghost\" data-toggle-load=\""+esc(l.id)+"\" type=\"button\">"+(l.status==="pending"?"Mark paid":"Mark pending")+"</button></td><td><button class=\"btn small ghost\" data-edit-load=\""+esc(l.id)+"\" type=\"button\">Edit</button> <button class=\"btn small ghost\" data-del-load=\""+esc(l.id)+"\" type=\"button\">Delete</button></td></tr>";
+  }).join("") : '<tr><td colspan="9" class="muted">No loads logged for '+uiYear+' yet.</td></tr>';
+  var incomePay = 0, incomeProfit = 0;
+  loads.forEach(function(l){ if(isIncomeLoad(l)){ incomePay = round2(incomePay + l.pay); incomeProfit = round2(incomeProfit + (l.pay - round2(l.loaded+l.deadhead)*cpm)); } });
+  $("ldTotalPay").textContent = fmt(incomePay);
+  $("ldTotalMiles").textContent = fmtNum(t.totalMiles);
+  $("ldTotalProfit").textContent = fmt(incomeProfit);
+  var pend = sortByDate(state.loads.filter(function(l){ return l.status==="pending"; }));
+  $("ldAging").innerHTML = pend.length ? pend.map(function(l){
+    var d = daysBetween(l.date, todayStr());
+    var flag = d>60 ? ' <span class="flag over">60+</span>' : (d>30 ? ' <span class="flag due">30+</span>' : "");
+    return "<tr><td>"+esc(l.broker)+" — "+esc(l.origin)+" → "+esc(l.dest)+(l.demo?' <span class="flag">sample</span>':"")+"</td><td>"+esc(l.date)+"</td><td class=\"num\">"+d+flag+"</td><td class=\"num\">"+fmt(l.pay)+"</td></tr>";
+  }).join("") : '<tr><td colspan="4" class="muted">No unpaid loads. 🎉</td></tr>';
+}
+function renderFuel(t){
+  var stops = sortByDate(state.fuel.filter(function(f){ return yearOf(f.date)===uiYear; }));
+  $("fuList").innerHTML = stops.length ? stops.map(function(f){
+    return "<tr><td>"+esc(f.date)+"</td><td>"+esc(f.juris)+" — "+esc(JURMAP[f.juris]||"")+(f.demo?' <span class="flag">sample</span>':"")+"</td><td class=\"num\">"+fmtNum(f.gallons)+"</td><td class=\"num\">"+fmt(f.cost)+"</td><td class=\"num\">"+(f.gallons>0?fmt(f.cost/f.gallons):"—")+"</td><td>"+(f.odometer?fmtNum(f.odometer):"—")+(f.notes?'<br><span class="muted">'+esc(f.notes)+"</span>":"")+"</td><td><button class=\"btn small ghost\" data-edit-fuel=\""+esc(f.id)+"\" type=\"button\">Edit</button> <button class=\"btn small ghost\" data-del-fuel=\""+esc(f.id)+"\" type=\"button\">Delete</button></td></tr>";
+  }).join("") : '<tr><td colspan="7" class="muted">No fuel stops logged for '+uiYear+' yet.</td></tr>';
+  $("fuTotalGal").textContent = fmtNum(t.fuelGal);
+  $("fuTotalCost").textContent = fmt(t.fuelCost);
+  $("fuAvgGal").textContent = t.fuelGal>0 ? fmt(t.avgPerGal) : "—";
+  $("fuPerMile").textContent = t.totalMiles>0 ? ("Fuel cost per mile ("+uiYear+"): "+fmt(t.fuelCpm)+" over "+fmtNum(t.totalMiles)+" miles · average "+fmt(t.avgPerGal)+" per gallon.") : "";
+}
+function renderIfta(){
+  var y = uiIfta.year, q = uiIfta.q;
+  var entries = sortByDate(state.jurisMiles.filter(function(r){ return yearOf(r.date)===y && quarterOf(r.date)===q; }));
+  $("jmList").innerHTML = entries.length ? entries.map(function(r){
+    return "<tr><td>"+esc(r.date)+"</td><td>"+esc(r.juris)+" — "+esc(JURMAP[r.juris]||"")+(r.demo?' <span class="flag">sample</span>':"")+"</td><td class=\"num\">"+fmtNum(r.miles)+"</td><td>"+esc(r.note)+"</td><td><button class=\"btn small ghost\" data-edit-jm=\""+esc(r.id)+"\" type=\"button\">Edit</button> <button class=\"btn small ghost\" data-del-jm=\""+esc(r.id)+"\" type=\"button\">Delete</button></td></tr>";
+  }).join("") : '<tr><td colspan="5" class="muted">No miles-by-state entries for Q'+q+" "+y+" yet.</td></tr>";
+  var w = iftaForQuarter(y, q);
+  $("iftaMiles").textContent = fmtNum(w.totalMiles);
+  $("iftaGallons").textContent = fmtNum(w.totalGal);
+  $("iftaMpg").textContent = w.mpg>0 ? (Math.round(w.mpg*100)/100).toFixed(2) : "—";
+  $("iftaNet").textContent = w.anyRate ? fmt(w.totalNet) : "—";
+  $("iftaBody").innerHTML = w.rows.length ? w.rows.map(function(r){
+    var rateCell = '<input inputmode="decimal" type="number" step="0.001" min="0" max="10" style="width:100px;text-align:right" data-rate-juris="'+esc(r.juris)+'" value="'+(r.rate!==null?r.rate:"")+'" placeholder="enter rate">';
+    return "<tr><td>"+esc(r.juris)+" — "+esc(JURMAP[r.juris]||"")+"</td><td class=\"num\">"+fmtNum(r.miles)+"</td><td class=\"num\">"+(w.mpg>0?fmtNum(r.taxableGal):"—")+"</td><td class=\"num\">"+fmtNum(r.purchGal)+"</td><td class=\"num\">"+(w.mpg>0?fmtNum(r.netGal):"—")+"</td><td>"+rateCell+"</td><td class=\"num\">"+(r.net!==null?fmt(r.net):'<span class="flag due">no rate</span>')+"</td></tr>";
+  }).join("") : '<tr><td colspan="7" class="muted">Nothing for this quarter yet — add miles by state above and log fuel stops, then enter the quarter\'s official rates.</td></tr>';
+  $("iftaTotMiles").textContent = fmtNum(w.totalMiles);
+  $("iftaTotGal").textContent = fmtNum(w.totalGal);
+  $("iftaTotNet").textContent = w.anyRate ? fmt(w.totalNet) : "—";
+}
+function renderExpenses(t){
+  var exps = sortByDate(state.expenses.filter(function(r){ return yearOf(r.date)===uiYear; }));
+  $("expList").innerHTML = exps.length ? exps.map(function(r){
+    var c = CATMAP[r.cat];
+    return "<tr><td>"+esc(r.date)+"</td><td>"+esc(c.label)+"</td><td>"+(c.fixed?'<span class="flag">Fixed</span>':'<span class="flag due">Variable</span>')+"</td><td>"+esc(r.vendor)+(r.demo?' <span class="flag">sample</span>':"")+"</td><td>"+esc(r.notes)+"</td><td class=\"num\">"+fmt(r.amount)+"</td><td><button class=\"btn small ghost\" data-edit-exp=\""+esc(r.id)+"\" type=\"button\">Edit</button> <button class=\"btn small ghost\" data-del-exp=\""+esc(r.id)+"\" type=\"button\">Delete</button></td></tr>";
+  }).join("") : '<tr><td colspan="7" class="muted">No expenses logged for '+uiYear+' yet.</td></tr>';
+  $("expTotal").textContent = fmt(t.expTotal);
+  $("expByCat").innerHTML = CATS.map(function(c){
+    return "<tr><td>Line "+esc(c.line)+"</td><td>"+esc(c.label)+"</td><td>"+(c.fixed?"Fixed":"Variable")+"</td><td class=\"num\">"+fmt(t.byCat[c.key])+"</td></tr>";
+  }).join("");
+  $("expFixedTotal").textContent = fmt(t.expFixed);
+  $("expVarTotal").textContent = fmt(t.expVar);
+  $("cpmMiles").textContent = fmtNum(t.totalMiles);
+  $("cpmFuel").textContent = fmt(t.fuelCost);
+  $("cpmExp").textContent = fmt(t.expTotal);
+  $("cpmCost").textContent = fmt(t.totalCost);
+  $("cpmFixed").textContent = t.totalMiles>0 ? fmt(t.cpmFixed) : "—";
+  $("cpmVar").textContent = t.totalMiles>0 ? fmt(t.cpmVar) : "—";
+  $("cpmTotal").textContent = t.totalMiles>0 ? fmt(t.cpm) : "—";
+  $("cpmRevLoaded").textContent = t.loadedMiles>0 ? fmt(t.rpmLoaded) : "—";
+  $("cpmRevAll").textContent = t.totalMiles>0 ? fmt(t.rpmAll) : "—";
+}
+function renderTax(t){
+  var tax = taxFromProfit(t.profit);
+  $("taxProfit").textContent = fmt(tax.profit);
+  $("taxSeBase").textContent = fmt(tax.seBase);
+  $("taxSeTax").textContent = fmt(tax.seTax);
+  $("taxHalf").textContent = fmt(tax.half);
+  $("taxFed").textContent = fmt(tax.fed);
+  $("taxState").textContent = fmt(tax.state);
+  $("taxTotal").textContent = fmt(tax.total);
+  $("taxQuarterly").textContent = fmt(tax.quarterly);
+  $("taxFedRateLbl").textContent = state.settings.fedRate;
+  $("taxStateRateLbl").textContent = state.settings.stateRate;
+  var rows = quarterTable(uiYear);
+  $("taxQBody").innerHTML = rows.map(function(r){
+    return "<tr><td>Q"+r.q+"</td><td>"+esc(r.dueLabel)+"</td><td class=\"num\">"+fmt(r.thru)+"</td><td class=\"num\">"+fmt(r.annual)+"</td><td class=\"num\">"+fmt(r.cumDue)+"</td><td class=\"num\">"+fmt(r.suggested)+"</td>"
+      + "<td class=\"num\"><input type=\"number\" step=\"0.01\" min=\"0\" style=\"width:100px;text-align:right\" data-paid-q=\""+r.q+"\" value=\""+(r.paid||"")+"\" placeholder=\"0.00\"></td>"
+      + "<td class=\"num\">"+fmt(r.balance)+"</td></tr>";
+  }).join("");
+}
+function renderSettings(){
+  if(document.activeElement && ["setBiz","setOwner","setTruck","setFed","setState"].indexOf(document.activeElement.id)>=0) return;
+  $("setBiz").value = state.settings.bizName;
+  $("setOwner").value = state.settings.ownerName;
+  $("setTruck").value = state.settings.truck;
+  $("setBase").value = state.settings.baseJuris;
+  $("setFed").value = state.settings.fedRate;
+  $("setState").value = state.settings.stateRate;
+}
+
+/* ---------- row edit (loads / fuel / expenses / miles) ---------- */
+var editId = { load:null, fuel:null, exp:null, jm:null };
+function findRec(list, id){ for(var i=0;i<list.length;i++) if(list[i].id===id) return list[i]; return null; }
+function editChrome(addId, cancelId, editing, addLabel){
+  var b = $(addId); if(b) b.textContent = editing ? "Save changes" : addLabel;
+  var c = $(cancelId); if(c) c.style.display = editing ? "" : "none";
+}
+function scrollToForm(id){ var f = $(id); if(f && f.scrollIntoView) f.scrollIntoView(); }
+function resetLoadForm(){ editId.load = null; ["ldBroker","ldOrigin","ldDest","ldPay","ldLoaded","ldDead","ldCommodity","ldNotes"].forEach(function(i){ $(i).value=""; }); editChrome("ldAdd","ldCancel",false,"Add load"); }
+function resetFuelForm(){ editId.fuel = null; ["fuGallons","fuCost","fuOdo","fuNotes"].forEach(function(i){ $(i).value=""; }); editChrome("fuAdd","fuCancel",false,"Add fuel stop"); }
+function resetExpForm(){ editId.exp = null; ["expVendor","expAmount","expNotes"].forEach(function(i){ $(i).value=""; }); editChrome("expAdd","expCancel",false,"Add expense"); }
+function resetJmForm(){ editId.jm = null; ["jmMiles","jmNote"].forEach(function(i){ $(i).value=""; }); editChrome("jmAdd","jmCancel",false,"Add miles"); }
+function startEditLoad(id){
+  var l = findRec(state.loads, id); if(!l) return;
+  editId.load = id;
+  $("ldDate").value=l.date; $("ldBroker").value=l.broker; $("ldOrigin").value=l.origin; $("ldDest").value=l.dest;
+  $("ldPay").value=l.pay; $("ldLoaded").value=l.loaded; $("ldDead").value=l.deadhead; $("ldCommodity").value=l.commodity;
+  $("ldStatus").value=l.status; $("ldNotes").value=l.notes;
+  editChrome("ldAdd","ldCancel",true,"Add load");
+  setMsg("ldMsg","Editing load — "+l.broker+", "+l.date+". Fix the fields and tap Save changes, or Cancel edit.", true);
+  scrollToForm("loadForm");
+}
+function startEditFuel(id){
+  var f = findRec(state.fuel, id); if(!f) return;
+  editId.fuel = id;
+  $("fuDate").value=f.date; $("fuJuris").value=f.juris; $("fuGallons").value=f.gallons; $("fuCost").value=f.cost;
+  $("fuOdo").value=f.odometer||""; $("fuNotes").value=f.notes;
+  editChrome("fuAdd","fuCancel",true,"Add fuel stop");
+  setMsg("fuMsg","Editing fuel stop — "+f.date+", "+f.juris+". Fix the fields and tap Save changes, or Cancel edit.", true);
+  scrollToForm("fuForm");
+}
+function startEditExp(id){
+  var r = findRec(state.expenses, id); if(!r) return;
+  editId.exp = id;
+  $("expDate").value=r.date; $("expCat").value=r.cat; $("expVendor").value=r.vendor; $("expAmount").value=r.amount; $("expNotes").value=r.notes;
+  editChrome("expAdd","expCancel",true,"Add expense");
+  setMsg("expMsg","Editing expense — "+r.vendor+", "+r.date+". Fix the fields and tap Save changes, or Cancel edit.", true);
+  scrollToForm("expForm");
+}
+function startEditJm(id){
+  var r = findRec(state.jurisMiles, id); if(!r) return;
+  editId.jm = id;
+  $("jmDate").value=r.date; $("jmJuris").value=r.juris; $("jmMiles").value=r.miles; $("jmNote").value=r.note;
+  editChrome("jmAdd","jmCancel",true,"Add miles");
+  setMsg("jmMsg","Editing miles entry — "+r.date+", "+r.juris+". Fix the fields and tap Save changes, or Cancel edit.", true);
+  scrollToForm("jmForm");
+}
+
+/* ---------- print ---------- */
+function printHTML(title, bodyHTML){
+  $("printSheet").innerHTML = "<h1>"+esc(title)+"</h1>"
+    + "<p>"+esc(state.settings.bizName||"")+(state.settings.ownerName? " — "+esc(state.settings.ownerName):"")+(state.settings.truck? " · "+esc(state.settings.truck):"")+" · Generated "+esc(todayStr())+"</p>"
+    + bodyHTML
+    + '<p style="margin-top:14px;font-size:11.5px">Prepared with RigLedger from the owner\'s own logs. Planning worksheet — not a filed return and not tax advice. Verify rates and figures before filing.</p>';
+  window.print();
+}
+function printIfta(){
+  var y = uiIfta.year, q = uiIfta.q;
+  var w = iftaForQuarter(y, q);
+  var rows = w.rows.map(function(r){
+    return "<tr><td>"+esc(r.juris)+" — "+esc(JURMAP[r.juris]||"")+"</td><td class=\"num\">"+fmtNum(r.miles)+"</td><td class=\"num\">"+(w.mpg>0?fmtNum(r.taxableGal):"—")+"</td><td class=\"num\">"+fmtNum(r.purchGal)+"</td><td class=\"num\">"+(w.mpg>0?fmtNum(r.netGal):"—")+"</td><td class=\"num\">"+(r.rate!==null?("$"+r.rate.toFixed(3)):"no rate entered")+"</td><td class=\"num\">"+(r.net!==null?fmt(r.net):"—")+"</td></tr>";
+  }).join("");
+  printHTML("IFTA Worksheet — Q"+q+" "+y+" (base jurisdiction: "+(JURMAP[state.settings.baseJuris]||state.settings.baseJuris)+")",
+    "<table><tr><td>Total miles (all jurisdictions)</td><td class=\"num\">"+fmtNum(w.totalMiles)+"</td></tr>"
+    + "<tr><td>Total gallons purchased (all jurisdictions)</td><td class=\"num\">"+fmtNum(w.totalGal)+"</td></tr>"
+    + "<tr><td>Fleet MPG (total miles ÷ total gallons)</td><td class=\"num\">"+(w.mpg>0?(Math.round(w.mpg*100)/100).toFixed(2):"—")+"</td></tr></table>"
+    + "<h2>By jurisdiction</h2><table><thead><tr><th>Jurisdiction</th><th class=\"num\">Miles</th><th class=\"num\">Taxable gal</th><th class=\"num\">Gal purchased</th><th class=\"num\">Net taxable gal</th><th class=\"num\">Rate entered</th><th class=\"num\">Net tax / (credit)</th></tr></thead><tbody>"+rows+"</tbody></table>"
+    + "<table><tr><td><b>Quarter net tax / (credit)</b></td><td class=\"num\"><b>"+(w.anyRate?fmt(w.totalNet):"— (no rates entered)")+"</b></td></tr></table>"
+    + "<p>Rates are the operator-entered rates for this quarter. Each jurisdiction's net is rounded to cents, then summed. File the official return with your base jurisdiction.</p>");
+}
+function printTaxSheet(){
+  var t = totalsForYear(uiYear);
+  var tax = taxFromProfit(t.profit);
+  var rows = quarterTable(uiYear).map(function(r){
+    return "<tr><td>Q"+r.q+"</td><td>"+esc(r.dueLabel)+"</td><td class=\"num\">"+fmt(r.thru)+"</td><td class=\"num\">"+fmt(r.annual)+"</td><td class=\"num\">"+fmt(r.cumDue)+"</td><td class=\"num\">"+fmt(r.suggested)+"</td><td class=\"num\">"+fmt(r.paid)+"</td><td class=\"num\">"+fmt(r.balance)+"</td></tr>";
+  }).join("");
+  printHTML("Quarterly Estimated Tax Worksheet — "+uiYear,
+    "<table>"
+    + "<tr><td>Year-to-date net profit</td><td class=\"num\">"+fmt(tax.profit)+"</td></tr>"
+    + "<tr><td>SE tax base (× 92.35%)</td><td class=\"num\">"+fmt(tax.seBase)+"</td></tr>"
+    + "<tr><td>SE tax (× 15.3%)</td><td class=\"num\">"+fmt(tax.seTax)+"</td></tr>"
+    + "<tr><td>Half-SE deduction</td><td class=\"num\">"+fmt(tax.half)+"</td></tr>"
+    + "<tr><td>Federal estimate (× "+state.settings.fedRate+"%)</td><td class=\"num\">"+fmt(tax.fed)+"</td></tr>"
+    + "<tr><td>State estimate (× "+state.settings.stateRate+"%)</td><td class=\"num\">"+fmt(tax.state)+"</td></tr>"
+    + "<tr><td><b>Total estimated tax</b></td><td class=\"num\"><b>"+fmt(tax.total)+"</b></td></tr></table>"
+    + "<h2>Quarters</h2><table><thead><tr><th>Qtr</th><th>Due</th><th class=\"num\">Profit thru</th><th class=\"num\">Annualized</th><th class=\"num\">Cum. due</th><th class=\"num\">Suggested</th><th class=\"num\">Paid</th><th class=\"num\">Balance</th></tr></thead><tbody>"+rows+"</tbody></table>");
+}
+
+/* ---------- events ---------- */
+function setMsg(id, text, ok){ var el=$(id); if(!el) return; el.textContent = text||""; el.className = "msg "+(text?(ok?"ok":"err"):""); }
+function clearDemo(){
+  ["loads","fuel","expenses","jurisMiles"].forEach(function(k){ state[k] = state[k].filter(function(r){ return !r.demo; }); });
+  state.meta.demoCleared = true;
+  uiIfta = defaultIftaQuarter();
+  save(); render();
+}
+function doExport(){
+  var blob = new Blob([JSON.stringify(state, null, 2)], {type:"application/json"});
+  var a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "rigledger-backup.json";
+  document.body.appendChild(a); a.click();
+  setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); }, 400);
+}
+function doImport(text, msgId){
+  var parsed;
+  try{ parsed = JSON.parse(text); }catch(e){ return setMsg(msgId, "That file isn't valid JSON — nothing was imported."); }
+  if(!parsed || typeof parsed!=="object" || parsed.app!=="rigledger"){ return setMsg(msgId, "That backup isn't a RigLedger backup — nothing was imported."); }
+  var clean = sanitizeState(parsed);
+  if(!clean){ return setMsg(msgId, "That backup couldn't be read — nothing was imported."); }
+  state = clean;
+  uiYear = new Date().getFullYear();
+  uiIfta = defaultIftaQuarter();
+  save(); render();
+  setMsg(msgId, "Backup imported.", true);
+}
+function init(){
+  load();
+  var jurisOpts = JURIS.map(function(j){ return '<option value="'+j[0]+'">'+j[0]+" — "+esc(j[1])+"</option>"; }).join("");
+  $("fuJuris").innerHTML = jurisOpts;
+  $("jmJuris").innerHTML = jurisOpts;
+  $("setBase").innerHTML = jurisOpts;
+  $("expCat").innerHTML = CATS.map(function(c){ return '<option value="'+c.key+'">Line '+esc(c.line)+" — "+esc(c.label)+(c.fixed?" (fixed)":" (variable)")+"</option>"; }).join("");
+  var today = todayStr();
+  ["ldDate","fuDate","jmDate","expDate"].forEach(function(id){ $(id).value = today; });
+  $("tabBar").addEventListener("click", function(e){ var b = e.target.closest("button[data-tab]"); if(b) showTab(b.getAttribute("data-tab")); });
+  $("yearSel").addEventListener("change", function(){ uiYear = +this.value; render(); });
+  $("iftaQSel").addEventListener("change", function(){ var parts = this.value.split("-Q"); uiIfta = { year:+parts[0], q:+parts[1] }; render(); });
+  /* loads */
+  $("loadForm").addEventListener("submit", function(e){
+    e.preventDefault();
+    var date=$("ldDate").value, broker=$("ldBroker").value.trim(), pay=num($("ldPay").value);
+    if(!validDate(date)) return setMsg("ldMsg","Pick a valid pickup date.");
+    if(!broker) return setMsg("ldMsg","Enter the broker or shipper.");
+    if(!(pay>0)) return setMsg("ldMsg","Enter load pay greater than $0.");
+    var lFields = { date:date, broker:broker.slice(0,120), origin:$("ldOrigin").value.trim().slice(0,120), dest:$("ldDest").value.trim().slice(0,120), pay:round2(pay), loaded:amt(num($("ldLoaded").value)), deadhead:amt(num($("ldDead").value)), commodity:$("ldCommodity").value.trim().slice(0,200), status:$("ldStatus").value, notes:$("ldNotes").value.trim().slice(0,300) };
+    if(editId.load){
+      var l0 = findRec(state.loads, editId.load);
+      if(l0){ Object.keys(lFields).forEach(function(k){ l0[k] = lFields[k]; }); }
+      uiYear = yearOf(date); save(); render(); resetLoadForm();
+      setMsg("ldMsg","Load updated.", true);
+      return;
+    }
+    lFields.id = uid(); lFields.demo = false;
+    state.loads.push(lFields);
+    uiYear = yearOf(date); save(); render();
+    $("ldBroker").value=""; $("ldOrigin").value=""; $("ldDest").value=""; $("ldPay").value=""; $("ldLoaded").value=""; $("ldDead").value=""; $("ldCommodity").value=""; $("ldNotes").value="";
+    setMsg("ldMsg","Load added.", true);
+  });
+  /* fuel */
+  $("fuForm").addEventListener("submit", function(e){
+    e.preventDefault();
+    var date=$("fuDate").value, gallons=num($("fuGallons").value), cost=num($("fuCost").value);
+    if(!validDate(date)) return setMsg("fuMsg","Pick a valid date.");
+    if(!(gallons>0)) return setMsg("fuMsg","Enter gallons greater than 0.");
+    if(cost<0) return setMsg("fuMsg","Cost can't be negative.");
+    var fFields = { date:date, juris:$("fuJuris").value, gallons:round2(gallons), cost:round2(cost), odometer:amt(num($("fuOdo").value)), notes:$("fuNotes").value.trim().slice(0,300) };
+    if(editId.fuel){
+      var f0 = findRec(state.fuel, editId.fuel);
+      if(f0){ Object.keys(fFields).forEach(function(k){ f0[k] = fFields[k]; }); }
+      uiYear = yearOf(date); save(); render(); resetFuelForm();
+      setMsg("fuMsg","Fuel stop updated.", true);
+      return;
+    }
+    fFields.id = uid(); fFields.demo = false;
+    state.fuel.push(fFields);
+    uiYear = yearOf(date); save(); render();
+    $("fuGallons").value=""; $("fuCost").value=""; $("fuOdo").value=""; $("fuNotes").value="";
+    setMsg("fuMsg","Fuel stop added.", true);
+  });
+  /* jurisdiction miles */
+  $("jmForm").addEventListener("submit", function(e){
+    e.preventDefault();
+    var date=$("jmDate").value, miles=num($("jmMiles").value);
+    if(!validDate(date)) return setMsg("jmMsg","Pick a valid date.");
+    if(!(miles>0)) return setMsg("jmMsg","Enter miles greater than 0.");
+    var jFields = { date:date, juris:$("jmJuris").value, miles:round2(miles), note:$("jmNote").value.trim().slice(0,300) };
+    if(editId.jm){
+      var j0 = findRec(state.jurisMiles, editId.jm);
+      if(j0){ Object.keys(jFields).forEach(function(k){ j0[k] = jFields[k]; }); }
+      uiYear = yearOf(date); uiIfta = { year: yearOf(date), q: quarterOf(date) }; save(); render(); resetJmForm();
+      setMsg("jmMsg","Miles entry updated.", true);
+      return;
+    }
+    jFields.id = uid(); jFields.demo = false;
+    state.jurisMiles.push(jFields);
+    uiYear = yearOf(date); uiIfta = { year: yearOf(date), q: quarterOf(date) }; save(); render();
+    $("jmMiles").value=""; $("jmNote").value="";
+    setMsg("jmMsg","Miles added.", true);
+  });
+  /* expenses */
+  $("expForm").addEventListener("submit", function(e){
+    e.preventDefault();
+    var date=$("expDate").value, vendor=$("expVendor").value.trim(), amount=num($("expAmount").value);
+    if(!validDate(date)) return setMsg("expMsg","Pick a valid date.");
+    if(!vendor) return setMsg("expMsg","Enter the vendor or payee.");
+    if(!(amount>0)) return setMsg("expMsg","Enter an amount greater than $0.");
+    var eFields = { date:date, cat:$("expCat").value, vendor:vendor.slice(0,120), amount:round2(amount), notes:$("expNotes").value.trim().slice(0,300) };
+    if(editId.exp){
+      var e0 = findRec(state.expenses, editId.exp);
+      if(e0){ Object.keys(eFields).forEach(function(k){ e0[k] = eFields[k]; }); }
+      uiYear = yearOf(date); save(); render(); resetExpForm();
+      setMsg("expMsg","Expense updated.", true);
+      return;
+    }
+    eFields.id = uid(); eFields.demo = false;
+    state.expenses.push(eFields);
+    uiYear = yearOf(date); save(); render();
+    $("expVendor").value=""; $("expAmount").value=""; $("expNotes").value="";
+    setMsg("expMsg","Expense added.", true);
+  });
+  /* IFTA rate inputs (delegated) */
+  $("iftaBody").addEventListener("change", function(e){
+    var inp = e.target.closest("input[data-rate-juris]");
+    if(!inp) return;
+    var j = inp.getAttribute("data-rate-juris");
+    var k = qKey(uiIfta.year, uiIfta.q);
+    var raw = inp.value.trim();
+    if(raw===""){ if(state.iftaRates[k]){ delete state.iftaRates[k][j]; if(!Object.keys(state.iftaRates[k]).length) delete state.iftaRates[k]; } }
+    else {
+      var v = num(raw);
+      if(v<0 || v>10){ setMsg("iftaMsg","Rate looks off — enter the per-gallon rate from the quarterly sheet (e.g. 0.200)."); render(); return; }
+      if(!state.iftaRates[k]) state.iftaRates[k]={};
+      state.iftaRates[k][j] = v;
+    }
+    save(); render();
+    setMsg("iftaMsg","Rate saved for Q"+uiIfta.q+" "+uiIfta.year+".", true);
+  });
+  /* estimated-tax paid inputs (delegated) */
+  $("taxQBody").addEventListener("change", function(e){
+    var inp = e.target.closest("input[data-paid-q]");
+    if(!inp) return;
+    state.estPayments[uiYear+"-Q"+inp.getAttribute("data-paid-q")] = amt(num(inp.value));
+    save(); render();
+  });
+  /* edits, deletes + toggles (delegated) */
+  document.addEventListener("click", function(e){
+    function find(attr){ var b = e.target.closest("button["+attr+"]"); return b ? b.getAttribute(attr) : null; }
+    var id;
+    if((id = find("data-edit-load"))){ startEditLoad(id); }
+    else if((id = find("data-edit-fuel"))){ startEditFuel(id); }
+    else if((id = find("data-edit-exp"))){ startEditExp(id); }
+    else if((id = find("data-edit-jm"))){ startEditJm(id); }
+    else if((id = find("data-del-load"))){
+      var l = findRec(state.loads, id);
+      if(!l || !window.confirm("Delete this load — "+l.broker+", "+l.origin+" → "+l.dest+", "+l.date+", "+fmt(l.pay)+"? This cannot be undone.")) return;
+      state.loads = state.loads.filter(function(r){ return r.id!==id; });
+      if(editId.load===id) resetLoadForm();
+      save(); render();
+    }
+    else if((id = find("data-toggle-load"))){ state.loads.forEach(function(l){ if(l.id===id) l.status = (l.status==="pending") ? "paid" : "pending"; }); save(); render(); }
+    else if((id = find("data-del-fuel"))){
+      var f = findRec(state.fuel, id);
+      if(!f || !window.confirm("Delete this fuel stop — "+f.date+", "+(JURMAP[f.juris]||f.juris)+", "+fmtNum(f.gallons)+" gal, "+fmt(f.cost)+"? This cannot be undone.")) return;
+      state.fuel = state.fuel.filter(function(r){ return r.id!==id; });
+      if(editId.fuel===id) resetFuelForm();
+      save(); render();
+    }
+    else if((id = find("data-del-jm"))){
+      var j = findRec(state.jurisMiles, id);
+      if(!j || !window.confirm("Delete this miles entry — "+j.date+", "+(JURMAP[j.juris]||j.juris)+", "+fmtNum(j.miles)+" miles? This cannot be undone.")) return;
+      state.jurisMiles = state.jurisMiles.filter(function(r){ return r.id!==id; });
+      if(editId.jm===id) resetJmForm();
+      save(); render();
+    }
+    else if((id = find("data-del-exp"))){
+      var x = findRec(state.expenses, id);
+      if(!x || !window.confirm("Delete this expense — "+x.vendor+", "+(CATMAP[x.cat]?CATMAP[x.cat].label:x.cat)+", "+x.date+", "+fmt(x.amount)+"? This cannot be undone.")) return;
+      state.expenses = state.expenses.filter(function(r){ return r.id!==id; });
+      if(editId.exp===id) resetExpForm();
+      save(); render();
+    }
+  });
+  /* cancel-edit buttons */
+  $("ldCancel").addEventListener("click", function(){ resetLoadForm(); setMsg("ldMsg",""); });
+  $("fuCancel").addEventListener("click", function(){ resetFuelForm(); setMsg("fuMsg",""); });
+  $("expCancel").addEventListener("click", function(){ resetExpForm(); setMsg("expMsg",""); });
+  $("jmCancel").addEventListener("click", function(){ resetJmForm(); setMsg("jmMsg",""); });
+  /* settings */
+  $("setForm").addEventListener("submit", function(e){
+    e.preventDefault();
+    state.settings.bizName = $("setBiz").value.trim().slice(0,120);
+    state.settings.ownerName = $("setOwner").value.trim().slice(0,120);
+    state.settings.truck = $("setTruck").value.trim().slice(0,120);
+    state.settings.baseJuris = $("setBase").value;
+    state.settings.fedRate = Math.min(60, Math.max(0, num($("setFed").value)));
+    state.settings.stateRate = Math.min(30, Math.max(0, num($("setState").value)));
+    save(); render();
+    setMsg("setMsg","Settings saved.", true);
+  });
+  /* backup */
+  $("btnExport").addEventListener("click", doExport);
+  $("importFile").addEventListener("change", function(){
+    var f = this.files && this.files[0];
+    if(!f) return;
+    var reader = new FileReader();
+    reader.onload = function(){ doImport(String(reader.result||""), "importMsg"); };
+    reader.onerror = function(){ setMsg("importMsg","Couldn't read that file — nothing was imported."); };
+    reader.readAsText(f);
+    this.value = "";
+  });
+  $("btnImportText").addEventListener("click", function(){ doImport($("importText").value, "importMsg"); });
+  /* demo + erase */
+  function onClearDemo(msgId){ clearDemo(); setMsg(msgId,"Sample data cleared — your entries are untouched.", true); }
+  $("btnClearDemo").addEventListener("click", function(){ onClearDemo("dataMsg"); });
+  $("btnClearDemoDash").addEventListener("click", function(){ onClearDemo("dashMsg"); });
+  $("btnEraseAll").addEventListener("click", function(){
+    if(!window.confirm("Erase ALL RigLedger data in this browser and start empty? This cannot be undone.")) return;
+    state = blankState();
+    state.meta.demoCleared = true;
+    uiYear = new Date().getFullYear();
+    uiIfta = defaultIftaQuarter();
+    save(); render();
+    setMsg("dataMsg","Everything erased. The app is empty.", true);
+  });
+  /* print */
+  $("btnPrintIfta").addEventListener("click", printIfta);
+  $("btnPrintTax").addEventListener("click", printTaxSheet);
+  render();
+}
+document.addEventListener("DOMContentLoaded", init);
+</script>
+
+<style id="wwLegalCss">
+#wwLegalOverlay{position:fixed;inset:0;z-index:99990;background:rgba(10,12,16,.72);display:flex;align-items:flex-start;justify-content:center;overflow-y:auto;padding:18px 12px;box-sizing:border-box}
+#wwLegalOverlay[hidden]{display:none}
+.ww-card{background:#fff;color:#16181d;max-width:560px;width:100%;border-radius:14px;padding:22px 20px;box-sizing:border-box;box-shadow:0 12px 40px rgba(0,0,0,.4)}
+.ww-appname{font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:#5b6472;font-weight:700}
+.ww-card h2{margin:6px 0 10px;font-size:24px}
+.ww-sum{font-size:17px;line-height:1.45;font-weight:600;margin:10px 0}
+.ww-follow{color:#444c58;font-size:14px;line-height:1.45}
+.ww-updated{background:#fff4d6;border:1px solid #e3c566;color:#5c4a00;border-radius:8px;padding:8px 10px;font-size:14px}
+.ww-btn{display:block;width:100%;min-height:48px;margin:10px 0 0;padding:12px 14px;font-size:16px;border-radius:10px;border:1px solid #9aa3af;background:#f2f4f7;color:#16181d;cursor:pointer;box-sizing:border-box}
+.ww-btn.ww-primary{background:#14532d;border-color:#14532d;color:#fff;font-weight:700;min-height:52px}
+.ww-btn.ww-primary:disabled{opacity:.45;cursor:not-allowed}
+.ww-check{display:flex;gap:10px;align-items:flex-start;margin:14px 0 2px;font-size:15px;line-height:1.4;color:#16181d;cursor:pointer}
+.ww-check input{width:22px;height:22px;flex:0 0 auto;margin:1px 0 0;accent-color:#14532d;cursor:pointer}
+#wwLegalPanel{position:fixed;inset:0;z-index:99995;background:#fff;color:#16181d;overflow-y:auto;box-sizing:border-box}
+#wwLegalPanel[hidden]{display:none}
+.ww-panel-inner{max-width:720px;margin:0 auto;padding:16px 18px 40px;box-sizing:border-box;line-height:1.55}
+.ww-panel-inner h3{margin-top:26px}
+.ww-panel-inner h4{margin-top:20px}
+.ww-accept{background:#eef7ee;border:1px solid #b9d8b9;border-radius:8px;padding:10px 12px}
+.ww-seller{margin-top:28px;padding-top:12px;border-top:1px solid #ddd;color:#444c58}
+#wwLegalClose{min-height:48px;padding:10px 16px;font-size:16px;border-radius:10px;border:1px solid #9aa3af;background:#f2f4f7;color:#16181d;cursor:pointer}
+[data-ww-legal-card]{border:1px solid #9aa3af;border-radius:12px;padding:14px;margin:14px 0;background:rgba(127,127,127,.06)}
+[data-ww-legal-btn]{min-height:48px;padding:10px 16px;font-size:16px;border-radius:10px;border:1px solid #14532d;background:#14532d;color:#fff;font-weight:700;cursor:pointer;width:100%}
+@media print{#wwLegalOverlay,#wwLegalPanel,[data-ww-legal-card]{display:none!important}}
+</style>
+
+<!-- ===== White Wolf Legal Pattern v1.0 ===== -->
+<div id="wwLegalOverlay" hidden>
+  <div class="ww-card" role="dialog" aria-modal="true" aria-labelledby="wwLegalTitle">
+    <div class="ww-appname">RigLedger</div>
+    <h2 id="wwLegalTitle">Terms of Use</h2>
+    <p class="ww-updated" id="wwUpdatedNote" hidden>Our terms were updated (v1.0).</p>
+    <p class="ww-sum">Your data stays on your device.<br>Estimates are aids, not guarantees.<br>You&#39;re responsible for checking outputs before you rely on them.</p>
+    <p class="ww-follow">The full Terms and Disclaimer are one tap away, now and any time in Settings &#8594; Legal.</p>
+    <button type="button" class="ww-btn" id="wwReadTerms">Read the full Terms</button>
+    
+    <label class="ww-check"><input type="checkbox" id="wwAgreeCheck"> <span>I have read and I agree to the Terms of Use</span></label>
+    <button type="button" class="ww-btn ww-primary" id="wwAgree" disabled>I Agree</button>
+  </div>
+</div>
+<div id="wwLegalPanel" hidden>
+  <div class="ww-panel-inner">
+    <button type="button" id="wwLegalClose">&#8592; Back</button>
+    <h2>Legal</h2>
+    <p class="ww-accept" id="wwAcceptLine">You have not recorded acceptance of the Terms yet.</p>
+    <h3>Terms of Use</h3>
+    <p><strong>Version 1.0 (DRAFT — pending attorney review)</strong> <strong>Seller: White Wolf Tree Service LLC, selling digital products under the name "White Wolf Digital"</strong> <strong>Contact: whitewolfoklahoma@gmail.com</strong></p>
+<hr>
+<h4>1. What you're buying</h4>
+<p>Our apps (including ForgeFit AI, ForgeKitchen, TreeBid Pro, SnowBid, WashPrice Pro, RoofSquares, JobProfit Tracker, PastureLedger, and the other titles sold under White Wolf Digital) are single-file software tools. When you buy one, you are buying a <strong>license to use the file</strong>, not ownership of the software itself.</p>
+<h4>2. Your license</h4>
+<ul>
+<li>You may use the app for your own personal or business work.</li>
+<li>You may open it on your own devices (phone, tablet, computer) and move your</li>
+</ul>
+<p>own data between them using the app's built-in backup/export tools.</p>
+<ul>
+<li>You may <strong>not</strong> resell, redistribute, give away, upload, or share the app</li>
+</ul>
+<p>file (or a copy of it) with anyone else — including posting it online, bundling it with other products, or selling access to it.</p>
+<ul>
+<li>You may <strong>not</strong> claim the app as your own work, remove its branding or</li>
+</ul>
+<p>notices, or use it to build a competing product for resale.</p>
+<ul>
+<li>One purchase = one buyer. A business purchase covers the buyer and their</li>
+</ul>
+<p>own employees using it for that business's work; it does not cover other businesses.</p>
+<h4>3. Your data stays yours — and stays on your device</h4>
+<ul>
+<li>The current versions of our apps run <strong>entirely on your device</strong>. They have</li>
+</ul>
+<p>no accounts, no sign-in, no analytics, and they collect, transmit, and store <strong>none</strong> of your information on any server. We never see your data.</p>
+<ul>
+<li>Your records are stored in your browser/app storage on your device. **You</li>
+</ul>
+<p>are responsible for backing them up** using the app's export tools. If you clear your browser data, lose your device, or uninstall the app, your records may be permanently lost, and we cannot recover them — we never had a copy.</p>
+<ul>
+<li>Files you export (backups, quotes, PDFs) are under your control. Where you</li>
+</ul>
+<p>store or send them is up to you.</p>
+<h4>4. Estimates are tools, not guarantees</h4>
+<p>Every number our apps produce — bids, prices, costs, calorie targets, projections, schedules, totals — is an <strong>estimate generated from the information you enter and the settings you choose</strong>. Outputs are aids for your own judgment, not guarantees of price, profit, outcome, or result. You are responsible for checking any output before relying on it (see also the disclaimer that applies to your app: Health Disclaimer for fitness/nutrition apps, Estimator Disclaimer for contractor tools). If an input is wrong, the output will be wrong.</p>
+<h4>5. Acceptable use</h4>
+<p>Don't use the apps to break the law, infringe anyone's rights, or misrepresent quotes, invoices, or records to your own customers. For the fitness apps, the guardrails in the app (healthy-rate limits, calorie floor) are part of the product — don't treat the app as a way around them.</p>
+<h4>6. Provided "as is"</h4>
+<p>The apps are provided <strong>"as is" and "as available," without warranties of any kind</strong>, express or implied — including merchantability, fitness for a particular purpose, accuracy of calculations, and uninterrupted or error-free operation — to the maximum extent allowed by law. Software has bugs; browsers change; we work to fix problems but do not promise any app is error-free or will work on every device or browser forever.</p>
+<h4>7. Limitation of liability</h4>
+<p>To the maximum extent allowed by law:</p>
+<ul>
+<li>We are **not liable for indirect, incidental, special, or consequential</li>
+</ul>
+<p>damages** — including lost profits, lost or mispriced jobs, lost data, or business interruption — arising from use of the apps.</p>
+<ul>
+<li>Our total liability for any claim connected to an app is limited to the</li>
+</ul>
+<p><strong>amount you paid for that app</strong>.</p>
+<ul>
+<li>Nothing in these terms limits liability that cannot legally be limited.</li>
+</ul>
+<h4>8. Refunds</h4>
+<p>Refunds are handled <strong>by the storefront you bought from, under that storefront's policy</strong> — Gumroad's refund policy for Gumroad purchases, and Google Play's refund policy for Play purchases. These terms do not add to, replace, or override the storefront's refund rules. If a file is defective and won't open, contact us at whitewolfoklahoma@gmail.com and we'll fix or replace the file.</p>
+<h4>9. Updates and changes to these terms</h4>
+<ul>
+<li>We may release updated versions of an app. Updates may add, change, or</li>
+</ul>
+<p>remove features.</p>
+<ul>
+<li>We may update these terms. The version you agreed to is recorded in the</li>
+</ul>
+<p>app (version number and date) at first-run acceptance. If terms change, the app may ask you to accept the new version once on next open. Updated terms apply going forward, not retroactively.</p>
+<ul>
+<li>If you don't agree to an updated version of the terms, stop using the app.</li>
+</ul>
+<h4>10. Governing law</h4>
+<p>These terms are governed by the laws of the <strong>State of Oklahoma</strong>, USA. (Attorney to confirm governing law and venue before publication.)</p>
+<h4>11. Contact</h4>
+<p>White Wolf Tree Service LLC (White Wolf Digital) — whitewolfoklahoma@gmail.com.</p>
+<hr>
+<h4>CONNECTED FEATURES — takes effect only when these features ship</h4>
+<p><em>The sections below apply only to future connected features (device sync via Health Connect, AI voice logging, and the AI Goal Preview in ForgeFit). They do not apply to the current offline versions, which never transmit data.</em></p>
+<ul>
+<li><strong>Opt-in only.</strong> Connected features are off by default. Each one asks for</li>
+</ul>
+<p>your separate, explicit consent — on its own consent screen, in plain language — before anything leaves your device. Declining never disables the app's offline features.</p>
+<ul>
+<li><strong>What gets sent.</strong> Only what the consent screen names, only when you use</li>
+</ul>
+<p>the feature: for example, a meal description (text, or audio only if cloud transcription is on) for AI voice logging, or the single photo you choose for an AI Goal Preview.</p>
+<ul>
+<li><strong>No retention by us.</strong> Our relay service passes your request to the named</li>
+</ul>
+<p>AI provider and keeps nothing — no copies of your photos, audio, transcripts, or entries are stored on our servers. Provider handling is described on the consent screen and in the Privacy Policy.</p>
+<ul>
+<li><strong>Health data stays on the device.</strong> Device sync (Health Connect) reads</li>
+</ul>
+<p>your health data on your phone and stores it in the app on your phone. It is not uploaded to us.</p>
+<ul>
+<li><strong>Allowances.</strong> Some connected features run on third-party AI services we</li>
+</ul>
+<p>pay for per use, so they may include a monthly allowance described in the app (for example, a set number of AI previews or voice entries per month), with optional additional credits. Allowances and pricing will be shown in the app before you use the feature; they are not a subscription unless the app says so in plain words.</p>
+<ul>
+<li><strong>Permissions.</strong> Connected features may request device permissions (such</li>
+</ul>
+<p>as Health Connect access or the microphone) at the moment you first use them. You can revoke permissions any time in your device settings; the related feature will simply stop working.</p>
+    
+    <h3>Privacy</h3>
+    <p>This app has no accounts and collects no data. Everything you enter is stored only on your device, in your browser/app storage, and is never uploaded, transmitted, or shared. We never see your data. Files you export (backups, quotes, PDFs) are under your control &mdash; store and send them only where you choose. If you clear your browser data, lose your device, or uninstall the app, your records may be permanently lost, so export backups regularly.</p>
+    <p class="ww-seller">Sold by White Wolf Tree Service LLC (White Wolf Digital) &mdash; whitewolfoklahoma@gmail.com</p>
+  </div>
+</div>
+
+<script>
+/* ===== White Wolf Legal Pattern v1.0 ===== */
+(function(){
+"use strict";
+var TERMS_VERSION = "1.0";
+var WW_KEY = "rigledger.v1";
+var WW_HAS_DISC = false;
+var WWREC = null;
+function wwValid(r){ return r && typeof r === "object" && typeof r.termsVersion === "string" && !!r.termsVersion; }
+function wwVerCmp(a,b){ var pa=String(a).split("."), pb=String(b).split("."); for(var i=0;i<3;i++){ var x=parseInt(pa[i]||"0",10)||0, y=parseInt(pb[i]||"0",10)||0; if(x<y) return -1; if(x>y) return 1; } return 0; }
+function wwReadStored(){ try{ var raw = localStorage.getItem(WW_KEY); if(!raw) return null; var o = JSON.parse(raw); return (o && typeof o === "object") ? o : null; }catch(e){ return null; } }
+var _wwStored = wwReadStored();
+if(_wwStored && wwValid(_wwStored.legal)) WWREC = _wwStored.legal;
+try{
+  var _wwOrigSet = localStorage.setItem.bind(localStorage);
+  localStorage.setItem = function(k,v){
+    if(k === WW_KEY && typeof v === "string"){
+      try{ var o = JSON.parse(v); if(o && typeof o === "object" && !Array.isArray(o)){
+        if(wwValid(o.legal)){ WWREC = o.legal; }
+        else if(WWREC){ o.legal = WWREC; v = JSON.stringify(o); }
+      } }catch(e){}
+    }
+    return _wwOrigSet(k,v);
+  };
+}catch(e){}
+function wwSyncState(){ try{ if(typeof state !== "undefined" && state && typeof state === "object" && WWREC) state.legal = WWREC; }catch(e){} }
+function wwPersist(){
+  wwSyncState();
+  try{ save() }catch(e){}
+  try{ var o = wwReadStored(); if(o){ o.legal = WWREC; localStorage.setItem(WW_KEY, JSON.stringify(o)); } }catch(e){}
+}
+function wwAcceptLine(){
+  var el = document.getElementById("wwAcceptLine"); if(!el) return;
+  if(WWREC && WWREC.acceptedDate){ el.textContent = "You agreed to Terms v" + WWREC.termsVersion + " on " + WWREC.acceptedDate + "."; }
+  else { el.textContent = "You have not recorded acceptance of the Terms yet."; }
+}
+function wwOpenLegal(){ var p = document.getElementById("wwLegalPanel"); if(p){ p.hidden = false; p.scrollTop = 0; } wwAcceptLine(); }
+function wwCloseLegal(){ var p = document.getElementById("wwLegalPanel"); if(p) p.hidden = true; }
+function wwInit(){
+  var overlay = document.getElementById("wwLegalOverlay");
+  var agree = document.getElementById("wwAgree");
+  var rt = document.getElementById("wwReadTerms");
+  var rd = document.getElementById("wwReadDisc");
+  var close = document.getElementById("wwLegalClose");
+  if(rt) rt.addEventListener("click", wwOpenLegal);
+  if(rd) rd.addEventListener("click", wwOpenLegal);
+  if(close) close.addEventListener("click", wwCloseLegal);
+  var agreeCheck = document.getElementById("wwAgreeCheck");
+  if(agree) agree.disabled = !(agreeCheck && agreeCheck.checked);
+  if(agreeCheck && agree) agreeCheck.addEventListener("change", function(){ agree.disabled = !agreeCheck.checked; });
+  if(agree) agree.addEventListener("click", function(){
+    if(agree.disabled || !(agreeCheck && agreeCheck.checked)) return;
+    WWREC = { termsVersion: TERMS_VERSION, acceptedDate: new Date().toISOString().slice(0,10), disclaimerShown: WW_HAS_DISC };
+    wwPersist(); wwAcceptLine();
+    if(overlay) overlay.hidden = true;
+  });
+  wwSyncState(); wwAcceptLine();
+  if(!WWREC || wwVerCmp(WWREC.termsVersion, TERMS_VERSION) < 0){
+    if(WWREC){ var note = document.getElementById("wwUpdatedNote"); if(note) note.hidden = false; }
+    if(overlay) overlay.hidden = false;
+  }
+  var anchors = [{sel:"#tab-settings",marker:null},{sel:"#tab-help",marker:null}];
+  function wwEnsureBtn(){
+    for(var i=0;i<anchors.length;i++){
+      var a = anchors[i]; var el = document.querySelector(a.sel); if(!el) continue;
+      if(el.querySelector("[data-ww-legal-btn]")) continue;
+      var txt = el.textContent || "";
+      if(a.marker){ if(txt.toLowerCase().indexOf(a.marker.toLowerCase()) < 0) continue; }
+      else if(txt.replace(/\s+/g,"").length < 40) continue;
+      var card = document.createElement("div");
+      card.setAttribute("data-ww-legal-card","");
+      card.innerHTML = "<h3 style=\"margin:0 0 6px\">Legal</h3><p style=\"margin:0 0 10px\">Terms of Use, disclaimer and privacy for this app.</p>";
+      var b = document.createElement("button");
+      b.type = "button"; b.setAttribute("data-ww-legal-btn",""); b.textContent = "View Legal \u2014 Terms, Disclaimer & Privacy";
+      b.addEventListener("click", wwOpenLegal);
+      card.appendChild(b); el.appendChild(card);
+    }
+  }
+  wwEnsureBtn();
+  setInterval(wwEnsureBtn, 700);
+}
+if(document.readyState === "loading") document.addEventListener("DOMContentLoaded", wwInit); else wwInit();
+})();
+</script>
+</body>
+</html>
